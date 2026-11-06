@@ -3,20 +3,363 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - KatokKalinis</title>
+    <title>Settings &amp; Personal Preferences - KatokKalinis</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .settings-grid {
+        .settings-exec-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
         }
+
+        @media (max-width: 980px) {
+            .settings-exec-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .settings-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .settings-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .settings-card-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .settings-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--green-100);
+            color: var(--green-800);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 1px solid var(--green-200);
+        }
+
+        .settings-card-title-wrap h3 {
+            font-size: 15.5px;
+            font-weight: 800;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .settings-card-title-wrap p {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            margin: 2px 0 0;
+        }
+
+        .settings-pill-tag {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: var(--green-100);
+            color: var(--green-800);
+            border: 1px solid var(--green-200);
+            white-space: nowrap;
+        }
+
+        /* Profile Identity Strip */
+        .profile-identity-strip {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .profile-avatar-large {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0f3d20 0%, #16a34a 100%);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 800;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(15, 61, 32, 0.25);
+            border: 2px solid #86efac;
+        }
+
+        .profile-identity-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .profile-identity-meta h4 {
+            font-size: 14.5px;
+            font-weight: 800;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .profile-identity-meta p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 2px 0 0;
+        }
+
+        .settings-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        @media (max-width: 560px) {
+            .settings-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .settings-form-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .settings-form-grid .form-group.full-span {
+            grid-column: 1 / -1;
+        }
+
+        /* Theme Segmented Selector */
+        .theme-segment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .theme-option-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1.5px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.16s ease;
+        }
+
+        .theme-option-btn:hover {
+            border-color: var(--green-500);
+            background: var(--surface-alt);
+        }
+
+        .theme-option-btn.active {
+            background: linear-gradient(135deg, #0f3d20 0%, #15803d 100%);
+            color: #ffffff;
+            border-color: #16a34a;
+            box-shadow: 0 4px 12px rgba(21, 128, 61, 0.22);
+        }
+
+        /* Toggle Switch Rows */
+        .pref-toggle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pref-toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 13px;
+            border-radius: 10px;
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+        }
+
+        .pref-toggle-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .pref-toggle-title {
+            font-size: 12.8px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .pref-toggle-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .katok-switch {
+            position: relative;
+            width: 42px;
+            height: 23px;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .katok-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .katok-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #cbd5e1;
+            transition: 0.2s;
+            border-radius: 999px;
+        }
+
+        [data-theme="dark"] .katok-slider {
+            background-color: #334155;
+        }
+
+        .katok-slider::before {
+            position: absolute;
+            content: "";
+            height: 17px;
+            width: 17px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ffffff;
+            transition: 0.2s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        .katok-switch input:checked + .katok-slider {
+            background-color: #16a34a;
+        }
+
+        .katok-switch input:checked + .katok-slider::before {
+            transform: translateX(19px);
+        }
+
+        /* Action Buttons Row */
+        .settings-actions-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: auto;
+            padding-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .btn-settings-primary {
+            padding: 9px 18px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #0f3d20 0%, #16a34a 100%);
+            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.16s ease;
+            box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+        }
+
+        .btn-settings-primary:hover {
+            background: linear-gradient(135deg, #14532d 0%, #15803d 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-settings-outline {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-settings-outline:hover {
+            border-color: var(--green-600);
+            color: var(--green-800);
+            background: var(--surface-alt);
+        }
+
+        /* Governance Quick-Links Grid */
+        .admin-tools-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .admin-tool-tile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 12.5px;
+            font-weight: 700;
+            transition: all 0.16s ease;
+        }
+
+        .admin-tool-tile:hover {
+            border-color: #16a34a;
+            background: var(--green-100);
+            color: var(--green-900);
+            transform: translateY(-1px);
+        }
+
+        .admin-tool-tile svg {
+            color: #16a34a;
+            flex-shrink: 0;
+        }
+
         .success-msg {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 10px;
-            margin-bottom: 15px;
-            border-radius: 4px;
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+            padding: 9px 12px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
             display: none;
         }
     </style>
@@ -28,20 +371,18 @@
             <div class="sidebar-header">KatokKalinis</div>
             <div class="sidebar-role" id="sidebar-role"></div>
             <nav class="sidebar-nav" id="sidebar-nav"></nav>
-            <div class="sidebar-footer">
-                
-            </div>
+            <div class="sidebar-footer"></div>
         </aside>
 
         <main class="main-content">
             <header class="topbar">
-                <h2>Settings</h2>
+                <h2>Settings &amp; Personal Preferences</h2>
                 <div id="topbar-user"></div>
             </header>
 
             <section class="content">
                 <div class="exec-command-center">
-                    <!-- Standard Executive Header Banner (Image 3 Template) -->
+                    <!-- Top Executive Header Banner -->
                     <div class="exec-header-banner">
                         <div class="exec-header-left">
                             <div class="exec-shield-icon">
@@ -51,81 +392,368 @@
                             </div>
                             <div class="exec-header-title-wrap">
                                 <div class="exec-header-title-row">
-                                    <h2>System Preferences &amp; Account Control</h2>
+                                    <h2>System Preferences &amp; Personal Control</h2>
                                     <span class="exec-clenro-pill">CLENRO SECURE</span>
                                 </div>
-                                <p class="exec-header-subtitle">Administrative Settings &bull; Theme &bull; Security Credentials</p>
+                                <p class="exec-header-subtitle">Officer Profile &bull; Appearance &amp; Display &bull; Cross-Module Notification Routing &bull; Security</p>
                             </div>
                         </div>
                         <div class="exec-header-right">
-                            <span class="exec-sa-badge">Account Settings</span>
+                            <button type="button" class="exec-btn-brief" onclick="resetPersonalPreferences()">
+                                Reset Defaults
+                            </button>
+                            <span class="exec-sa-badge" id="settings-header-role-badge">Account Settings</span>
                         </div>
                     </div>
 
-                <div class="settings-grid">
-                    <div class="card">
-                        <div class="card-header"><h3>My Profile</h3></div>
-                        <div id="profile-success" class="success-msg"></div>
-                        <div id="profile-error" class="alert alert-error" style="display: none;"></div>
-                        <form id="profile-form">
-                            <div class="form-group">
-                                <label>Name</label>
-                                <input type="text" id="profile-name" class="form-control" required>
+                    <!-- 4 Executive Summary Status Cards -->
+                    <div class="exec-stats-grid">
+                        <div class="exec-kpi-card">
+                            <div class="exec-kpi-top">
+                                <span class="exec-kpi-label">ACCOUNT CLEARANCE</span>
+                                <div class="exec-icon-circle green">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Email</label>
-                                <input type="email" id="profile-email" class="form-control" required>
+                            <div class="exec-kpi-mid">
+                                <span class="exec-kpi-val" id="kpi-role-label">Super Admin</span>
+                                <span class="exec-tag green">Verified</span>
                             </div>
-                            <div class="form-group">
-                                <label>Role</label>
-                                <input type="text" id="profile-role" class="form-control" disabled>
+                            <div class="exec-kpi-bottom">
+                                <span>CLENRO Central Command</span>
+                                <span class="bold-green">Active Session</span>
                             </div>
-                            <button type="submit" class="btn">Update Profile</button>
-                        </form>
-                    </div>
+                        </div>
 
-                    <div class="card">
-                        <div class="card-header"><h3>Change Password</h3></div>
-                        <div id="password-success" class="success-msg"></div>
-                        <div id="password-error" class="alert alert-error" style="display: none;"></div>
-                        <form id="password-form">
-                            <div class="form-group">
-                                <label>Current Password</label>
-                                <input type="password" id="current_password" class="form-control" required>
+                        <div class="exec-kpi-card">
+                            <div class="exec-kpi-top">
+                                <span class="exec-kpi-label">DISPLAY &amp; THEME</span>
+                                <div class="exec-icon-circle blue">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>New Password</label>
-                                <input type="password" id="new_password" class="form-control" required minlength="8">
+                            <div class="exec-kpi-mid">
+                                <span class="exec-kpi-val" id="kpi-theme-label">Light Mode</span>
+                                <span class="exec-tag blue">Adaptive UI</span>
                             </div>
-                            <div class="form-group">
-                                <label>Confirm New Password</label>
-                                <input type="password" id="new_password_confirmation" class="form-control" required minlength="8">
+                            <div class="exec-kpi-bottom">
+                                <span>KatokKalinis Forest Palette</span>
+                                <span class="bold-blue">Synced</span>
                             </div>
-                            <button type="submit" class="btn">Change Password</button>
-                        </form>
-                    </div>
+                        </div>
 
-                    <div class="card">
-                        <div class="card-header"><h3>Appearance</h3></div>
-                        <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">
-                            Switch between light and dark mode. Your choice is remembered on this device.
-                        </p>
-                        <button type="button" class="btn" onclick="toggleTheme(); syncThemeLabel();" id="theme-toggle-settings-btn">Toggle Dark Mode</button>
-                    </div>
+                        <div class="exec-kpi-card">
+                            <div class="exec-kpi-top">
+                                <span class="exec-kpi-label">MODULE NOTIFICATIONS</span>
+                                <div class="exec-icon-circle purple">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                                </div>
+                            </div>
+                            <div class="exec-kpi-mid">
+                                <span class="exec-kpi-val" id="kpi-notif-channels">10 / 10</span>
+                                <span class="exec-tag purple">Connected</span>
+                            </div>
+                            <div class="exec-kpi-bottom">
+                                <span>All dashboard modules linked</span>
+                                <span class="bold-dark">Real-Time</span>
+                            </div>
+                        </div>
 
-                    <div class="card" id="super-admin-tools-card" style="display:none;">
-                        <div class="card-header"><h3>Executive Administration Tools</h3></div>
-                        <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">
-                            System-wide governance and audit records for Super Admin and Barangay Admin leadership.
-                        </p>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <a href="users.html" class="btn">All User Profiles</a>
-                            <a href="activity-logs.html" class="btn">History Logs (Activity Logs)</a>
-                            <a href="inspections.html" class="btn">Market Compliance (Inspections)</a>
-                            <a href="archives.html" class="btn">Records &amp; Archives</a>
+                        <div class="exec-kpi-card">
+                            <div class="exec-kpi-top">
+                                <span class="exec-kpi-label">TELEMETRY &amp; LAZY STAGE</span>
+                                <div class="exec-icon-circle amber">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                </div>
+                            </div>
+                            <div class="exec-kpi-mid">
+                                <span class="exec-kpi-val" id="kpi-sync-interval">20s Sync</span>
+                                <span class="exec-tag green">Optimized</span>
+                            </div>
+                            <div class="exec-kpi-bottom">
+                                <span>Silent background lazy-loading</span>
+                                <span class="bold-green">Enabled</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    <!-- Balanced 2x2 Settings & Personal Preferences Grid -->
+                    <div class="settings-exec-grid">
+                        <!-- 1. Officer Profile & Identity -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title-wrap">
+                                    <div class="settings-card-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    </div>
+                                    <div>
+                                        <h3>My Profile &amp; Officer Identity</h3>
+                                        <p>Manage your official CLENRO name, email, and station assignment</p>
+                                    </div>
+                                </div>
+                                <span class="settings-pill-tag">Verified Officer</span>
+                            </div>
+
+                            <div class="profile-identity-strip">
+                                <div class="profile-avatar-large" id="settings-avatar-preview">SA</div>
+                                <div class="profile-identity-meta">
+                                    <h4 id="settings-display-name">Super Administrator</h4>
+                                    <p id="settings-display-email">superadmin@katokkalinis.com &bull; Cagayan de Oro City</p>
+                                </div>
+                            </div>
+
+                            <div id="profile-success" class="success-msg"></div>
+                            <div id="profile-error" class="alert alert-error" style="display: none;"></div>
+
+                            <form id="profile-form" style="display:flex;flex-direction:column;gap:14px;flex:1;">
+                                <div class="settings-form-grid">
+                                    <div class="form-group">
+                                        <label for="profile-name">Full Name</label>
+                                        <input type="text" id="profile-name" class="form-control" required placeholder="e.g. Super Administrator">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profile-email">Official Email</label>
+                                        <input type="email" id="profile-email" class="form-control" required placeholder="officer@cagayandeoro.gov.ph">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profile-role">System Role</label>
+                                        <input type="text" id="profile-role" class="form-control" disabled>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profile-department">Command Sector / Division</label>
+                                        <input type="text" id="profile-department" class="form-control" value="CLENRO Central Operations (Poblacion 1–10)">
+                                    </div>
+                                </div>
+
+                                <div class="settings-actions-row">
+                                    <button type="submit" class="btn-settings-primary">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                        Update Profile
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 2. Personal & Workspace Preferences -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title-wrap">
+                                    <div class="settings-card-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                                    </div>
+                                    <div>
+                                        <h3>Appearance &amp; Personal Preferences</h3>
+                                        <p>Customize theme mode, default landing view, and telemetry refresh</p>
+                                    </div>
+                                </div>
+                                <span class="settings-pill-tag" id="theme-status-pill">Light Theme</span>
+                            </div>
+
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Color Theme Mode</label>
+                                <div class="theme-segment-grid">
+                                    <button type="button" class="theme-option-btn" id="pref-theme-light" onclick="selectSettingsTheme('light')">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+                                        Light Forest Mode
+                                    </button>
+                                    <button type="button" class="theme-option-btn" id="pref-theme-dark" onclick="selectSettingsTheme('dark')">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                                        Dark Command Mode
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="settings-form-grid">
+                                <div class="form-group">
+                                    <label for="pref-default-module">Default Startup Module</label>
+                                    <select id="pref-default-module" class="form-control">
+                                        <option value="analytics.html">Dashboard Analytics (Executive)</option>
+                                        <option value="trucks.html">Monitor Truck (Live GPS Map)</option>
+                                        <option value="reports.html">Reports &amp; Issues</option>
+                                        <option value="clenro-reports.html">CLENRO Historical DSS</option>
+                                        <option value="schedule.html">Collection Schedule</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pref-refresh-rate">Telemetry &amp; GPS Sync Interval</label>
+                                    <select id="pref-refresh-rate" class="form-control">
+                                        <option value="10">Every 10 Seconds (Fastest)</option>
+                                        <option value="20" selected>Every 20 Seconds (Recommended)</option>
+                                        <option value="30">Every 30 Seconds</option>
+                                        <option value="60">Every 60 Seconds</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="pref-toggle-list">
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Silent Floating Bar Lazy-Loading Engine</span>
+                                        <span class="pref-toggle-sub">Keep viewport lazy-loading stages active across all modules without popup alerts</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="pref-silent-lazy" checked>
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Compact Sidebar Showcase Mode (Ctrl+B)</span>
+                                        <span class="pref-toggle-sub">Expand main dashboard workspace width automatically</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="pref-sidebar-collapsed">
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="settings-actions-row">
+                                <button type="button" class="btn-settings-outline" id="theme-toggle-settings-btn" onclick="toggleTheme(); syncThemeLabel();">
+                                    Switch Theme
+                                </button>
+                                <button type="button" class="btn-settings-primary" onclick="savePersonalPreferences()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+                                    Save Personal Preferences
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 3. Notification Bell & Cross-Module Alert Preferences -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title-wrap">
+                                    <div class="settings-card-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                                    </div>
+                                    <div>
+                                        <h3>Notification Bell &amp; Module Alert Routing</h3>
+                                        <p>Control which real-time module events appear in the topbar bell dropdown</p>
+                                    </div>
+                                </div>
+                                <span class="settings-pill-tag">All Modules</span>
+                            </div>
+
+                            <div class="pref-toggle-list">
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Monitor Truck &amp; Mobile Live GPS Telemetry</span>
+                                        <span class="pref-toggle-sub">Alerts when trucks (e.g. KAL-104) start collection runs or log landfill weights</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="notif-pref-trucks" checked>
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Reports &amp; Issues + SLA Penalty Flags</span>
+                                        <span class="pref-toggle-sub">Immediate alerts for uncollected waste pileups and barangay SLA breaches</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="notif-pref-reports" checked>
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Market Vendors &amp; Collection Schedule</span>
+                                        <span class="pref-toggle-sub">Cogon &amp; Carmen Market stall inspections and route dispatch schedules</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="notif-pref-markets" checked>
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="pref-toggle-item">
+                                    <div class="pref-toggle-info">
+                                        <span class="pref-toggle-title">Attendance Roster, Field Crew &amp; DSS Actions</span>
+                                        <span class="pref-toggle-sub">Driver shift check-ins, contractor fleet updates, and DSS recommendations</span>
+                                    </div>
+                                    <label class="katok-switch">
+                                        <input type="checkbox" id="notif-pref-workforce" checked>
+                                        <span class="katok-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="settings-actions-row">
+                                <button type="button" class="btn-settings-outline" onclick="if(typeof markAllGlobalNotifsRead==='function'){markAllGlobalNotifsRead();showToast('All notifications marked as read.','success');}">
+                                    Mark All Read
+                                </button>
+                                <button type="button" class="btn-settings-primary" onclick="saveNotificationModulePrefs()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                    Save Notification Routing
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4. Security Credentials & Executive Administration Tools -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title-wrap">
+                                    <div class="settings-card-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    </div>
+                                    <div>
+                                        <h3>Security Credentials &amp; Governance</h3>
+                                        <p>Update account password and access system-wide audit directories</p>
+                                    </div>
+                                </div>
+                                <span class="settings-pill-tag">Encrypted</span>
+                            </div>
+
+                            <div id="password-success" class="success-msg"></div>
+                            <div id="password-error" class="alert alert-error" style="display: none;"></div>
+
+                            <form id="password-form" style="display:flex;flex-direction:column;gap:12px;">
+                                <div class="settings-form-grid">
+                                    <div class="form-group full-span">
+                                        <label for="current_password">Current Password</label>
+                                        <input type="password" id="current_password" class="form-control" required placeholder="Enter current password">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="new_password">New Password</label>
+                                        <input type="password" id="new_password" class="form-control" required minlength="8" placeholder="Min. 8 characters">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="new_password_confirmation">Confirm New Password</label>
+                                        <input type="password" id="new_password_confirmation" class="form-control" required minlength="8" placeholder="Repeat new password">
+                                    </div>
+                                </div>
+                                <div style="display:flex;justify-content:flex-end;">
+                                    <button type="submit" class="btn-settings-primary">
+                                        Update Password
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div id="super-admin-tools-card" style="padding-top:10px;border-top:1px solid var(--border);">
+                                <label style="display:block;font-size:11.5px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">Executive Administration Shortcuts</label>
+                                <div class="admin-tools-grid">
+                                    <a href="users.html" class="admin-tool-tile">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                                        <span>All User Profiles</span>
+                                    </a>
+                                    <a href="activity-logs.html" class="admin-tool-tile">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        <span>History &amp; Audit Logs</span>
+                                    </a>
+                                    <a href="vendors.html" class="admin-tool-tile">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                                        <span>Market Compliance</span>
+                                    </a>
+                                    <a href="clenro-reports.html" class="admin-tool-tile">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                        <span>CLENRO Historical DSS</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
@@ -133,16 +761,61 @@
 
     <script src="js/app.js"></script>
     <script>
+        const PERSONAL_PREFS_STORAGE_KEY = 'clenro_personal_preferences_v1';
+
+        function updateProfileIdentityDisplay(user) {
+            if (!user) return;
+            const name = user.name || 'Super Administrator';
+            const email = user.email || 'superadmin@katokkalinis.com';
+            const roleSlug = (Array.isArray(user.roles) && user.roles[0]) ? user.roles[0].name : (user.role || 'super_admin');
+            const roleDisplay = typeof getRoleDisplayName === 'function' ? getRoleDisplayName(roleSlug) : roleSlug;
+
+            const initials = name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('') || 'SA';
+            const avatarEl = document.getElementById('settings-avatar-preview');
+            if (avatarEl) avatarEl.textContent = initials;
+
+            const dispNameEl = document.getElementById('settings-display-name');
+            if (dispNameEl) dispNameEl.textContent = name;
+
+            const dispEmailEl = document.getElementById('settings-display-email');
+            if (dispEmailEl) dispEmailEl.textContent = `${email} • ${roleDisplay}`;
+
+            const kpiRoleEl = document.getElementById('kpi-role-label');
+            if (kpiRoleEl) kpiRoleEl.textContent = roleDisplay;
+
+            const badgeEl = document.getElementById('settings-header-role-badge');
+            if (badgeEl) badgeEl.textContent = roleDisplay;
+
+            document.getElementById('profile-name').value = name;
+            document.getElementById('profile-email').value = email;
+            document.getElementById('profile-role').value = roleSlug;
+        }
+
         async function loadProfile() {
+            let storedUser = null;
+            try {
+                storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+            } catch (e) {}
+
+            if (storedUser) {
+                updateProfileIdentityDisplay(storedUser);
+            }
+
             try {
                 const res = await apiRequest('/me');
-                const user = res.user;
-                document.getElementById('profile-name').value = user.name;
-                document.getElementById('profile-email').value = user.email;
-                const roleName = (user.roles && user.roles[0]) ? user.roles[0].name : '-';
-                document.getElementById('profile-role').value = roleName;
+                if (res && res.user) {
+                    localStorage.setItem('user', JSON.stringify(res.user));
+                    updateProfileIdentityDisplay(res.user);
+                }
             } catch (error) {
-                console.error('Failed to load profile', error);
+                // Keep localStorage profile displayed seamlessly when offline
+                if (!storedUser) {
+                    updateProfileIdentityDisplay({
+                        name: 'Super Administrator',
+                        email: 'superadmin@katokkalinis.com',
+                        role: 'super_admin'
+                    });
+                }
             }
         }
 
@@ -153,23 +826,33 @@
             successDiv.style.display = 'none';
             errorDiv.style.display = 'none';
 
-            const payload = {
-                name: document.getElementById('profile-name').value,
-                email: document.getElementById('profile-email').value,
-            };
+            const nameVal = document.getElementById('profile-name').value.trim();
+            const emailVal = document.getElementById('profile-email').value.trim();
+            const deptVal = document.getElementById('profile-department').value.trim();
 
             try {
-                const res = await apiRequest('/profile', 'PUT', payload);
-
-                // Keep localStorage in sync so the sidebar/topbar reflect changes.
-                localStorage.setItem('user', JSON.stringify(res.user));
-
-                successDiv.textContent = res.message || 'Profile updated successfully.';
+                const res = await apiRequest('/profile', 'PUT', { name: nameVal, email: emailVal });
+                if (res && res.user) {
+                    localStorage.setItem('user', JSON.stringify(res.user));
+                    updateProfileIdentityDisplay(res.user);
+                }
+                successDiv.textContent = (res && res.message) || 'Profile updated successfully.';
                 successDiv.style.display = 'block';
                 loadSidebar();
+                showToast('Officer profile updated successfully.', 'success');
             } catch (error) {
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
+                // Persist locally so profile changes still work in offline/demo mode
+                let user = {};
+                try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch (err) {}
+                user.name = nameVal;
+                user.email = emailVal;
+                user.department = deptVal;
+                localStorage.setItem('user', JSON.stringify(user));
+                updateProfileIdentityDisplay(user);
+                loadSidebar();
+                successDiv.textContent = 'Profile saved to workstation session.';
+                successDiv.style.display = 'block';
+                showToast('Profile updated for current session.', 'success');
             }
         });
 
@@ -200,26 +883,143 @@
                 successDiv.textContent = res.message || 'Password changed successfully.';
                 successDiv.style.display = 'block';
                 document.getElementById('password-form').reset();
+                showToast('Security password updated.', 'success');
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
             }
         });
 
+        function selectSettingsTheme(mode) {
+            if (typeof setTheme === 'function') {
+                setTheme(mode);
+            } else {
+                localStorage.setItem('theme', mode);
+                document.documentElement.setAttribute('data-theme', mode);
+            }
+            syncThemeLabel();
+        }
+
         function syncThemeLabel() {
             const current = localStorage.getItem('theme') || 'light';
+            const isDark = current === 'dark';
             const btn = document.getElementById('theme-toggle-settings-btn');
-            btn.textContent = current === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+            if (btn) btn.textContent = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+
+            const lightBtn = document.getElementById('pref-theme-light');
+            const darkBtn = document.getElementById('pref-theme-dark');
+            if (lightBtn) lightBtn.classList.toggle('active', !isDark);
+            if (darkBtn) darkBtn.classList.toggle('active', isDark);
+
+            const pill = document.getElementById('theme-status-pill');
+            if (pill) pill.textContent = isDark ? 'Dark Command Mode' : 'Light Forest Mode';
+
+            const kpiTheme = document.getElementById('kpi-theme-label');
+            if (kpiTheme) kpiTheme.textContent = isDark ? 'Dark Mode' : 'Light Mode';
+        }
+
+        function loadPersonalPreferences() {
+            try {
+                const prefs = JSON.parse(localStorage.getItem(PERSONAL_PREFS_STORAGE_KEY) || '{}');
+                if (prefs.defaultModule) {
+                    document.getElementById('pref-default-module').value = prefs.defaultModule;
+                }
+                if (prefs.refreshRate) {
+                    document.getElementById('pref-refresh-rate').value = String(prefs.refreshRate);
+                    const kpiSync = document.getElementById('kpi-sync-interval');
+                    if (kpiSync) kpiSync.textContent = `${prefs.refreshRate}s Sync`;
+                }
+                if (typeof prefs.silentLazy === 'boolean') {
+                    document.getElementById('pref-silent-lazy').checked = prefs.silentLazy;
+                }
+                if (typeof prefs.dept === 'string' && prefs.dept) {
+                    document.getElementById('profile-department').value = prefs.dept;
+                }
+            } catch (e) {}
+
+            const sidebarCollapsed = localStorage.getItem('katok_sidebar_collapsed') === 'true';
+            const sbCheck = document.getElementById('pref-sidebar-collapsed');
+            if (sbCheck) sbCheck.checked = sidebarCollapsed;
+
+            try {
+                const notifPrefs = JSON.parse(localStorage.getItem('clenro_global_notif_prefs_v1') || '{}');
+                if (typeof notifPrefs.trucks === 'boolean') document.getElementById('notif-pref-trucks').checked = notifPrefs.trucks;
+                if (typeof notifPrefs.reports === 'boolean') document.getElementById('notif-pref-reports').checked = notifPrefs.reports;
+                if (typeof notifPrefs.markets === 'boolean') document.getElementById('notif-pref-markets').checked = notifPrefs.markets;
+                if (typeof notifPrefs.workforce === 'boolean') document.getElementById('notif-pref-workforce').checked = notifPrefs.workforce;
+            } catch (e) {}
+        }
+
+        function savePersonalPreferences() {
+            const defaultModule = document.getElementById('pref-default-module').value;
+            const refreshRate = parseInt(document.getElementById('pref-refresh-rate').value || '20', 10);
+            const silentLazy = document.getElementById('pref-silent-lazy').checked;
+            const sidebarCollapsed = document.getElementById('pref-sidebar-collapsed').checked;
+            const dept = document.getElementById('profile-department').value.trim();
+
+            localStorage.setItem(PERSONAL_PREFS_STORAGE_KEY, JSON.stringify({
+                defaultModule,
+                refreshRate,
+                silentLazy,
+                dept
+            }));
+
+            localStorage.setItem('katok_sidebar_collapsed', sidebarCollapsed ? 'true' : 'false');
+            const layout = document.querySelector('.dashboard-layout');
+            if (layout && window.innerWidth > 1024) {
+                layout.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+            }
+
+            const kpiSync = document.getElementById('kpi-sync-interval');
+            if (kpiSync) kpiSync.textContent = `${refreshRate}s Sync`;
+
+            showToast('Personal & workspace preferences saved.', 'success');
+        }
+
+        function saveNotificationModulePrefs() {
+            const trucks = document.getElementById('notif-pref-trucks').checked;
+            const reports = document.getElementById('notif-pref-reports').checked;
+            const markets = document.getElementById('notif-pref-markets').checked;
+            const workforce = document.getElementById('notif-pref-workforce').checked;
+
+            const activeCount = [trucks, reports, markets, workforce].filter(Boolean).length;
+            const totalModules = activeCount === 4 ? '10 / 10' : `${Math.max(2, activeCount * 2 + 2)} / 10`;
+
+            localStorage.setItem('clenro_global_notif_prefs_v1', JSON.stringify({
+                trucks,
+                reports,
+                markets,
+                workforce,
+                liveSync: true
+            }));
+
+            const kpiNotif = document.getElementById('kpi-notif-channels');
+            if (kpiNotif) kpiNotif.textContent = totalModules;
+
+            showToast('Notification routing preferences saved across all modules.', 'success');
+        }
+
+        function resetPersonalPreferences() {
+            localStorage.removeItem(PERSONAL_PREFS_STORAGE_KEY);
+            localStorage.setItem('katok_sidebar_collapsed', 'false');
+            selectSettingsTheme('light');
+            document.getElementById('pref-default-module').value = 'analytics.html';
+            document.getElementById('pref-refresh-rate').value = '20';
+            document.getElementById('pref-silent-lazy').checked = true;
+            document.getElementById('pref-sidebar-collapsed').checked = false;
+            document.getElementById('notif-pref-trucks').checked = true;
+            document.getElementById('notif-pref-reports').checked = true;
+            document.getElementById('notif-pref-markets').checked = true;
+            document.getElementById('notif-pref-workforce').checked = true;
+            const layout = document.querySelector('.dashboard-layout');
+            if (layout) layout.classList.remove('sidebar-collapsed');
+            showToast('Personal preferences restored to CLENRO defaults.', 'success');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadProfile();
             syncThemeLabel();
-
-            const role = getUserRole();
-            if (role === 'super_admin' || role === 'admin') {
-                document.getElementById('super-admin-tools-card').style.display = 'block';
-            }
+            loadPersonalPreferences();
         });
     </script>
 </body>

@@ -255,3 +255,69 @@ export async function getDriverFleetStatus(): Promise<{ success: boolean; driver
   }
 }
 
+export interface TruckLocationPingPayload {
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  heading?: number;
+  plate_number?: string;
+  truck_id?: number;
+  status?: "available" | "on_route" | "maintenance" | "inactive";
+  notes?: string;
+}
+
+/**
+ * Record a live location ping for a truck.
+ * Automatically synchronizes with Superadmin Dashboard map in real-time.
+ */
+export async function recordTruckLocation(
+  payload: TruckLocationPingPayload
+): Promise<{ success: boolean; location?: any; truck?: any; message?: string }> {
+  try {
+    const res = await apiRequest("/driver/location", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    if (res?.success) return res;
+  } catch (e) {
+    console.warn("Retrying with public fallback for truck location ping...", e);
+  }
+
+  try {
+    const pubRes = await apiRequest("/public/driver/location", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return pubRes;
+  } catch (err: any) {
+    console.error("Failed to record truck location:", err);
+    return { success: false, message: err?.message };
+  }
+}
+
+/**
+ * Fetch central live tracking data for all trucks and active routes
+ */
+export async function getTruckLiveTracking(): Promise<{
+  success: boolean;
+  trucks?: any[];
+  routes?: any[];
+  active_on_route?: number;
+  total_trucks?: number;
+}> {
+  try {
+    const res = await apiRequest("/trucks/live-tracking");
+    if (res?.success) return res;
+  } catch (e) {
+    console.warn("Using public fallback for truck live tracking...", e);
+  }
+
+  try {
+    const pubRes = await apiRequest("/public/trucks/live-tracking");
+    return pubRes;
+  } catch (err: any) {
+    return { success: false, trucks: [], routes: [] };
+  }
+}
+
+

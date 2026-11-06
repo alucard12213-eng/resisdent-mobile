@@ -1431,7 +1431,7 @@
                             html += `
                                 <label style="opacity: 0.65; cursor: not-allowed;" title="Super Admin privileges can only be assigned by a Super Administrator">
                                     <input type="checkbox" value="${r.id}" ${isChecked ? 'checked' : ''} disabled>
-                                    <span>🔒 ${r.title} <small style="color: var(--text-muted); font-size: 11px;">(Requires Super Admin)</small></span>
+                                    <span>${r.title} <small style="color: var(--text-muted); font-size: 11px;">(Requires Super Admin)</small></span>
                                 </label>
                             `;
                         } else {

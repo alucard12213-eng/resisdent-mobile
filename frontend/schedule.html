@@ -503,7 +503,7 @@
                         </div>
                         <div class="exec-header-right">
                             <button type="button" id="dss-quick-schedule-btn" class="exec-btn-brief" style="display:none; background:#7c3aed; border-color:#a78bfa; color:#fff;" onclick="openPreFilledDssModal()">
-                                &#9889; Pre-Fill Schedule from DSS
+                                Pre-Fill Schedule from DSS
                             </button>
                             <button type="button" class="exec-btn-brief" onclick="openModal()" style="background:#22c55e;border-color:#4ade80;color:#fff;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -879,7 +879,7 @@
                     const time12 = formatTime12(item.pickup_time);
                     const brgy = item.barangay?.name || 'Collection';
                     const isDss = item.is_dss || (item.notes && item.notes.includes('[CLENRO DSS]'));
-                    const prefix = isDss ? '🧠 ' : '';
+                    const prefix = isDss ? '' : '';
                     const displayLabel = time12 ? `${prefix}${time12} · ${brgy}` : `${prefix}${brgy}`;
                     const fullTooltip = `${brgy} (${time12 || 'No time set'}) - Status: ${item.status || 'scheduled'}${item.notes ? ' · ' + item.notes : ''}`;
                     const dssStyle = isDss ? 'border-left: 3px solid #7c3aed; background: rgba(124, 58, 237, 0.10); font-weight: 700;' : '';

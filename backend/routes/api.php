@@ -319,6 +319,9 @@ Route::get('/public/inspector/stats', [InspectionController::class, 'getInspecto
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trucks', [TruckController::class, 'index']);
+    Route::get('/trucks/live-tracking', [TruckLocationController::class, 'liveTracking']);
+    Route::get('/trucks/routes-map', [TruckLocationController::class, 'routesMap']);
+    Route::post('/driver/location', [TruckLocationController::class, 'recordDriverLocation']);
     Route::post('/trucks', [TruckController::class, 'store']);
     Route::get('/trucks/{id}', [TruckController::class, 'show']);
     Route::put('/trucks/{id}', [TruckController::class, 'update']);
@@ -368,6 +371,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Demo/preview route
 Route::get('/public/trucks', [TruckController::class, 'index']);
+Route::get('/public/trucks/live-tracking', [TruckLocationController::class, 'liveTracking']);
+Route::get('/public/trucks/routes-map', [TruckLocationController::class, 'routesMap']);
+Route::post('/public/driver/location', [TruckLocationController::class, 'recordDriverLocation']);
+Route::get('/public/trucks/{id}/locations', [TruckLocationController::class, 'index']);
+Route::post('/public/trucks/{id}/locations', [TruckLocationController::class, 'store']);
 Route::post('/public/driver/truck-status', [TruckController::class, 'updateDriverTruckStatus']);
 Route::post('/public/driver/status', [TruckController::class, 'updateDriverTruckStatus']);
 Route::get('/public/driver/status', [TruckController::class, 'getDriverStatus']);

@@ -220,7 +220,7 @@
                     return `
                     <tr class="${flagged ? 'flagged-row' : ''}">
                         <td>${item.id}</td>
-                        <td>${vendorName}${flagged ? ' &#9888;' : ''}</td>
+                        <td>${vendorName}${flagged ? ' <span class="pill pill-red" style="font-size:10px;padding:1px 6px;margin-left:4px;">Flagged</span>' : ''}</td>
                         <td>${barangayName}</td>
                         <td>${inspectorName}</td>
                         <td><span class="score-pill ${scoreClass}">${item.total_score}%</span></td>

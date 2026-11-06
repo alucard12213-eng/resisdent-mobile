@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barangay Overview - KatokKalinis</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
         /* Fluid CSS Grid for KPI Stat Cards (No Fixed Column Counts) */
         .overview-stats-grid-6 {
@@ -544,6 +545,38 @@
                         </div>
                     </div>
 
+                    <!-- Live Barangay Collection Truck & Route Map Module (First in User View) -->
+                    <div class="card overview-card" id="barangay-live-map-card" style="margin-bottom: 14px; padding: 0; overflow: hidden;">
+                        <div class="card-header" style="padding: 12px 16px; margin-bottom: 0; background: linear-gradient(135deg, #0f291e 0%, #14532d 100%); color: #fff; border-bottom: none;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="width:34px; height:34px; border-radius:9px; background:rgba(34,197,94,0.2); border:1px solid rgba(134,239,172,0.35); display:flex; align-items:center; justify-content:center; color:#86efac;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                </div>
+                                <div>
+                                    <h3 style="color:#fff; font-size:14.5px; display:flex; align-items:center; gap:8px; margin:0;">
+                                        Live Barangay Collection Truck &amp; Route Map
+                                        <span style="font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(34,197,94,0.22); color:#86efac; border:1px solid rgba(134,239,172,0.4);">LIVE GPS</span>
+                                    </h3>
+                                    <p style="font-size:11.5px; color:rgba(255,255,255,0.75); margin:2px 0 0;">Real-time garbage truck telemetry synced with driver mobile app</p>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <select id="brgy-map-layer-select" onchange="switchBrgyMapTile(this.value)" style="background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:6px; padding:4px 8px; font-size:11.5px; font-weight:600; cursor:pointer;">
+                                    <option value="streets" style="color:#0f172a;" selected>🗺️ MapTiler Streets</option>
+                                    <option value="satellite" style="color:#0f172a;">🛰️ Satellite View</option>
+                                    <option value="carto" style="color:#0f172a;">🏙️ Clean City</option>
+                                </select>
+                                <button type="button" onclick="focusBrgyActiveTruck()" class="btn overview-panel-btn" style="background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.25);">
+                                    🎯 Locate Truck
+                                </button>
+                                <a href="trucks.html#live-fleet-map-section" class="btn overview-panel-btn" style="background:#22c55e; color:#052e16; border-color:#86efac; font-weight:700;">
+                                    Monitor Fleet ↗
+                                </a>
+                            </div>
+                        </div>
+                        <div id="barangay-overview-live-map" style="width:100%; height:290px; background:#e8f0e8;"></div>
+                    </div>
+
                     <!-- SECTION 1: Key Numbers at a Glance (Image 3 KPI Card Template) -->
                     <div class="exec-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
                         <div class="exec-kpi-card">
@@ -803,8 +836,93 @@
         </main>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""></script>
     <script src="js/app.js"></script>
     <script>
+        let brgyMapInstance = null;
+        let brgyMapTileLayer = null;
+        let brgyTruckMarkers = {};
+
+        const BRGY_ROUTES = [
+            { id: 1, name: 'Route 1: North Poblacion', truck: 'KAL-101', color: '#16a34a', pts: [[8.4762,124.6418],[8.4788,124.6435],[8.4814,124.6451],[8.4835,124.6480],[8.4860,124.6512]] },
+            { id: 2, name: 'Route 2: Central Poblacion', truck: 'KAL-102', color: '#2563eb', pts: [[8.4795,124.6440],[8.4782,124.6461],[8.4768,124.6479],[8.4755,124.6497],[8.4736,124.6528]] },
+            { id: 3, name: 'Route 3: East Poblacion', truck: 'KAL-103', color: '#d97706', pts: [[8.4848,124.6525],[8.4832,124.6549],[8.4808,124.6570],[8.4784,124.6555],[8.4758,124.6525]] },
+            { id: 4, name: 'Route 4: South Poblacion', truck: 'KAL-104', color: '#9333ea', pts: [[8.4752,124.6512],[8.4735,124.6488],[8.4720,124.6464],[8.4705,124.6442],[8.4685,124.6414]] }
+        ];
+
+        function initBrgyLiveMap() {
+            const el = document.getElementById('barangay-overview-live-map');
+            if (!el || typeof L === 'undefined' || brgyMapInstance) return;
+            brgyMapInstance = L.map('barangay-overview-live-map', {
+                center: [8.4752, 124.6488],
+                zoom: 14,
+                attributionControl: false
+            });
+            switchBrgyMapTile('streets');
+
+            BRGY_ROUTES.forEach(r => {
+                L.polyline(r.pts, { color: r.color, weight: 4, opacity: 0.8 }).addTo(brgyMapInstance);
+                const initPos = r.pts[1] || r.pts[0];
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="background:${r.id===4?'#15803d':r.color};color:#fff;font-size:10px;font-weight:800;padding:3px 7px;border-radius:999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;">🚛 ${r.truck}</div>`,
+                    iconSize: [74, 24],
+                    iconAnchor: [37, 12]
+                });
+                brgyTruckMarkers[r.truck] = L.marker(initPos, { icon })
+                    .addTo(brgyMapInstance)
+                    .bindPopup(`<b>Truck ${r.truck}</b><br/>${r.name}<br/>Status: Active On Route`);
+            });
+            syncBrgyLiveTrucks();
+        }
+
+        function switchBrgyMapTile(mode) {
+            if (!brgyMapInstance || typeof L === 'undefined') return;
+            if (brgyMapTileLayer) brgyMapInstance.removeLayer(brgyMapTileLayer);
+            const key = localStorage.getItem('katokkalinis_maptiler_key') || 'get_your_own_OpIi9ZULNHzrESv6T2vL';
+            if (mode === 'satellite') {
+                brgyMapTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(brgyMapInstance);
+            } else if (mode === 'carto') {
+                brgyMapTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(brgyMapInstance);
+            } else {
+                brgyMapTileLayer = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${encodeURIComponent(key)}`, { maxZoom: 20 });
+                brgyMapTileLayer.on('tileerror', function() {
+                    if (brgyMapInstance && brgyMapTileLayer) brgyMapInstance.removeLayer(brgyMapTileLayer);
+                    brgyMapTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(brgyMapInstance);
+                });
+                brgyMapTileLayer.addTo(brgyMapInstance);
+            }
+        }
+
+        async function syncBrgyLiveTrucks() {
+            if (!brgyMapInstance) return;
+            try {
+                let res = null;
+                try { res = await apiRequest('/trucks/live-tracking'); } catch(e) { res = await apiRequest('/public/trucks/live-tracking'); }
+                if (res && Array.isArray(res.trucks)) {
+                    res.trucks.forEach(t => {
+                        if (t.current_location && brgyTruckMarkers[t.plate_number]) {
+                            const lat = Number(t.current_location.latitude);
+                            const lng = Number(t.current_location.longitude);
+                            if (lat && lng) {
+                                brgyTruckMarkers[t.plate_number].setLatLng([lat, lng]);
+                            }
+                        }
+                    });
+                }
+            } catch (e) {}
+        }
+
+        function focusBrgyActiveTruck() {
+            if (!brgyMapInstance) return;
+            const m = brgyTruckMarkers['KAL-104'];
+            if (m) {
+                brgyMapInstance.flyTo(m.getLatLng(), 16, { duration: 0.6 });
+                m.openPopup();
+            }
+        }
+        window.switchBrgyMapTile = switchBrgyMapTile;
+        window.focusBrgyActiveTruck = focusBrgyActiveTruck;
         // Read URL params: ?barangay=<id>&name=<name>
         const urlParams    = new URLSearchParams(window.location.search);
         const barangayId   = urlParams.get('barangay');
@@ -1187,7 +1305,7 @@
                                         </a>
                                     ` : `
                                         <div class="issue-thumb-fallback" title="No photo attached">
-                                            📋
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                         </div>
                                     `}
                                     <div style="min-width: 0; flex: 1;">
@@ -1195,11 +1313,11 @@
                                             ${safeTitle}
                                         </div>
                                         <div class="scannable-row">
-                                            <span>📍 ${safeBarangay}</span>
+                                            <span>${safeBarangay}</span>
                                             <span>&bull;</span>
-                                            <span>👤 ${safeAuthor}</span>
+                                            <span>${safeAuthor}</span>
                                             <span>&bull;</span>
-                                            <span>🕒 ${timeAgoText}</span>
+                                            <span>${timeAgoText}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1315,9 +1433,9 @@
                                         </span>
                                     </div>
                                     <div class="notif-grid-details">
-                                        <div class="notif-grid-item">📍 Location: <strong>${escapeHtml(loc)}</strong></div>
-                                        <div class="notif-grid-item">🕒 Time: <strong>${escapeHtml(time)}</strong></div>
-                                        <div class="notif-grid-item" style="grid-column: span 2;">🚛 Driver: <strong>${escapeHtml(driver)}</strong></div>
+                                        <div class="notif-grid-item">Location: <strong>${escapeHtml(loc)}</strong></div>
+                                        <div class="notif-grid-item">Time: <strong>${escapeHtml(time)}</strong></div>
+                                        <div class="notif-grid-item" style="grid-column: span 2;">Driver: <strong>${escapeHtml(driver)}</strong></div>
                                     </div>
                                     <div class="notif-footer-row">
                                         <span style="font-size:10.5px; color:var(--text-muted);">${timeStr}</span>
@@ -1457,12 +1575,14 @@
         // Initialize and setup 5s auto-refresh for instant real-time driver sync
         document.addEventListener('DOMContentLoaded', () => {
             loadOverview();
+            initBrgyLiveMap();
 
             // Auto-refresh silently every 5 seconds (real-time sync without reload)
             if (refreshTimer) clearInterval(refreshTimer);
             refreshTimer = setInterval(() => {
                 if (document.visibilityState === 'visible') {
                     loadOverview();
+                    syncBrgyLiveTrucks();
                 }
             }, 5000);
 
@@ -1470,6 +1590,7 @@
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible') {
                     loadOverview();
+                    syncBrgyLiveTrucks();
                 }
             });
         });

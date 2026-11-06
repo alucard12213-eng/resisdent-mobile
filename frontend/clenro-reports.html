@@ -1907,7 +1907,7 @@
                             <label for="zone-combobox-input">Zone Type / Location</label>
                             <div class="combobox-wrapper" id="zone-combobox-wrapper">
                                 <div class="combobox-input-wrap">
-                                    <span class="combobox-search-icon">&#128269;</span>
+                                    <span class="combobox-search-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
                                     <input type="text" id="zone-combobox-input" class="combobox-input"
                                         placeholder="All Locations (or type to search...)"
                                         autocomplete="off" role="combobox" aria-autocomplete="list"
@@ -3757,7 +3757,7 @@
                         <span style="text-align:right; font-weight:700; color:var(--green-700);">${row.tons_2026.toFixed(2)} t</span>
                     </div>
                     <div style="display:grid; grid-template-columns: 110px 1fr 75px; gap:8px; align-items:center; font-size:12.5px;">
-                        <span style="color:var(--green-800);"><strong>🔮 2027 Forecast</strong></span>
+                        <span style="color:var(--green-800);"><strong>2027 Forecast</strong></span>
                         <div style="height:10px; background:var(--border); border-radius:5px; overflow:hidden;"><div style="width:${pct27}%; height:100%; background:repeating-linear-gradient(45deg, #15803d, #15803d 6px, #16a34a 6px, #16a34a 12px);"></div></div>
                         <span style="text-align:right; font-weight:800; color:var(--green-800);">${fc.trend2027.toFixed(2)} t</span>
                     </div>
@@ -4007,7 +4007,7 @@
 
             if (currentTrendChartMode === 'yearly') {
                 const years = ['2024', '2025', '2026'];
-                labels = ['Year 2024 (Actual)', 'Year 2025 (Actual)', 'Year 2026 (Current)', '🔮 Year 2027 (OLS Forecast)'];
+                labels = ['Year 2024 (Actual)', 'Year 2025 (Actual)', 'Year 2026 (Current)', 'Year 2027 (OLS Forecast)'];
                 years.forEach(yr => {
                     const yrItems = currentData.filter(i => {
                         if (!String(i.incident_date).startsWith(yr)) return false;

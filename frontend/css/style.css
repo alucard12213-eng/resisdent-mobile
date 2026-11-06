@@ -5278,6 +5278,644 @@ textarea:focus {
     background: currentColor;
 }
 
+/* ==========================================================================
+   6. GLOBAL TOPBAR NOTIFICATION BELL, SETTINGS ICON & DROPDOWN
+   ========================================================================== */
+.topbar-right-cluster {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    position: relative;
+}
+
+.global-notif-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.global-notif-bell-btn,
+.global-topbar-settings-btn {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1.5px solid #bbf7d0;
+    background: #f0fdf4;
+    color: #0f3d20;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    padding: 0;
+    outline: none;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.global-notif-bell-btn:hover,
+.global-notif-bell-btn.active,
+.global-topbar-settings-btn:hover,
+.global-topbar-settings-btn.active {
+    background: linear-gradient(135deg, #0f3d20 0%, #15803d 100%);
+    color: #ffffff;
+    border-color: #16a34a;
+    box-shadow: 0 4px 12px rgba(15, 61, 32, 0.25);
+    transform: translateY(-1px);
+}
+
+.global-topbar-settings-btn:hover svg {
+    transform: rotate(45deg);
+}
+
+[data-theme="dark"] .global-notif-bell-btn,
+[data-theme="dark"] .global-topbar-settings-btn {
+    background: #14351d;
+    border-color: #225431;
+    color: #dcfce7;
+}
+
+[data-theme="dark"] .global-notif-bell-btn:hover,
+[data-theme="dark"] .global-notif-bell-btn.active,
+[data-theme="dark"] .global-topbar-settings-btn:hover,
+[data-theme="dark"] .global-topbar-settings-btn.active {
+    background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+    border-color: #4ade80;
+    color: #ffffff;
+}
+
+.global-notif-bell-btn svg,
+.global-topbar-settings-btn svg {
+    width: 19px;
+    height: 19px;
+    transition: transform 0.24s ease;
+}
+
+.global-notif-bell-btn:hover svg,
+.global-notif-bell-btn.bell-ringing svg {
+    animation: gnotifBellRing 0.55s ease;
+}
+
+@keyframes gnotifBellRing {
+    0% { transform: rotate(0); }
+    20% { transform: rotate(16deg); }
+    40% { transform: rotate(-14deg); }
+    60% { transform: rotate(10deg); }
+    80% { transform: rotate(-6deg); }
+    100% { transform: rotate(0); }
+}
+
+.global-notif-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--surface, #ffffff);
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45);
+    line-height: 1;
+    pointer-events: none;
+}
+
+.global-notif-badge.hidden {
+    display: none !important;
+}
+
+/* KatokKalinis Prominent Forest Green & Emerald Notification Dropdown */
+.global-notif-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 396px;
+    min-height: 370px;
+    max-height: 515px;
+    background: linear-gradient(180deg, #0f3d20 0%, #0a2915 100%);
+    color: #ecfdf5;
+    border: 1.5px solid rgba(74, 222, 128, 0.28);
+    border-radius: 12px;
+    box-shadow: 0 20px 48px rgba(10, 41, 21, 0.55), 0 4px 14px rgba(0, 0, 0, 0.28);
+    display: none;
+    flex-direction: column;
+    z-index: 9999;
+    overflow: hidden;
+    animation: gnotifDropdownFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.global-notif-dropdown.open {
+    display: flex;
+}
+
+@keyframes gnotifDropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Dropdown Top Header: "Notifications" on left, "Settings" on right */
+.gnotif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px 12px;
+    border-bottom: 1px solid rgba(134, 239, 172, 0.16);
+    background: linear-gradient(135deg, #0d3a1e 0%, #14532d 100%);
+    flex-shrink: 0;
+}
+
+.gnotif-header-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gnotif-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+    display: inline-block;
+}
+
+.gnotif-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gnotif-settings-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    color: #ecfdf5;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 999px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s ease;
+}
+
+.gnotif-settings-btn:hover {
+    color: #064e3b;
+    background: #86efac;
+    border-color: #86efac;
+}
+
+/* Module Filter Chips Bar */
+.gnotif-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 14px;
+    background: rgba(6, 24, 12, 0.55);
+    border-bottom: 1px solid rgba(134, 239, 172, 0.14);
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+
+.gnotif-filter-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.gnotif-chip {
+    background: rgba(255, 255, 255, 0.08);
+    color: #bbf7d0;
+    border: 1px solid rgba(134, 239, 172, 0.2);
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.14s ease;
+}
+
+.gnotif-chip:hover {
+    color: #ffffff;
+    background: rgba(34, 197, 94, 0.28);
+    border-color: rgba(74, 222, 128, 0.45);
+}
+
+.gnotif-chip.active {
+    background: #22c55e;
+    color: #052e16;
+    border-color: #4ade80;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+/* Scrollable Notification Cards Body */
+.gnotif-body {
+    padding: 12px 14px 16px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.gnotif-body::-webkit-scrollbar {
+    width: 5px;
+}
+
+.gnotif-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.gnotif-body::-webkit-scrollbar-thumb {
+    background: rgba(134, 239, 172, 0.3);
+    border-radius: 999px;
+}
+
+/* Individual Notification Card in KatokKalinis Forest Green Theme */
+.gnotif-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(22, 101, 52, 0.65);
+    border-radius: 10px;
+    border: 1px solid rgba(134, 239, 172, 0.22);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    text-decoration: none;
+    color: inherit;
+}
+
+.gnotif-card.read {
+    background: rgba(15, 61, 32, 0.55);
+    border-color: rgba(134, 239, 172, 0.1);
+    opacity: 0.88;
+}
+
+.gnotif-card:hover {
+    background: rgba(21, 128, 61, 0.82);
+    border-color: #4ade80;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    transform: translateY(-1px);
+    opacity: 1;
+}
+
+/* Circular Avatar on Left of Notification Card */
+.gnotif-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    position: relative;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    border: 1.5px solid rgba(187, 247, 208, 0.4);
+    overflow: visible;
+}
+
+.gnotif-avatar.mod-trucks {
+    background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
+}
+.gnotif-avatar.mod-reports {
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+}
+.gnotif-avatar.mod-schedule {
+    background: linear-gradient(135deg, #15803d 0%, #047857 100%);
+}
+.gnotif-avatar.mod-vendors {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+.gnotif-avatar.mod-attendance {
+    background: linear-gradient(135deg, #059669 0%, #065f46 100%);
+}
+.gnotif-avatar.mod-dss {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+}
+.gnotif-avatar.mod-employees {
+    background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+}
+.gnotif-avatar.mod-contractors {
+    background: linear-gradient(135deg, #16a34a 0%, #14532d 100%);
+}
+.gnotif-avatar.mod-users {
+    background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+}
+.gnotif-avatar.mod-analytics {
+    background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+}
+
+.gnotif-avatar-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #0a2915;
+    border: 1.5px solid rgba(134, 239, 172, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+}
+
+.gnotif-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gnotif-text {
+    font-size: 12.8px;
+    line-height: 1.38;
+    color: #ecfdf5;
+    font-weight: 400;
+    word-break: break-word;
+}
+
+.gnotif-text strong {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.gnotif-text .gnotif-handle {
+    color: #86efac;
+    font-weight: 600;
+}
+
+.gnotif-meta {
+    font-size: 11.5px;
+    color: #bbf7d0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.gnotif-mod-tag {
+    color: #4ade80;
+    font-weight: 700;
+    font-size: 10.5px;
+}
+
+.gnotif-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+}
+
+/* "See All ->" Row directly below cards */
+.gnotif-see-all-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 0;
+}
+
+.gnotif-mark-read-link {
+    background: none;
+    border: none;
+    color: #bbf7d0;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.gnotif-mark-read-link:hover {
+    color: #ffffff;
+}
+
+.gnotif-see-all-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+    margin-left: auto;
+}
+
+.gnotif-see-all-link:hover {
+    background: rgba(74, 222, 128, 0.18);
+    color: #86efac;
+}
+
+/* Inline Settings View inside Dropdown */
+.gnotif-settings-panel {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(6, 24, 12, 0.72);
+    border-bottom: 1px solid rgba(134, 239, 172, 0.16);
+    font-size: 12px;
+}
+
+.gnotif-settings-panel.open {
+    display: flex;
+}
+
+.gnotif-settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #dcfce7;
+    gap: 8px;
+}
+
+.gnotif-empty {
+    text-align: center;
+    padding: 36px 16px;
+    color: #bbf7d0;
+    font-size: 12.5px;
+}
+
+@media (max-width: 520px) {
+    .global-notif-dropdown {
+        width: calc(100vw - 24px);
+        right: -10px;
+    }
+}
+
+/* ==========================================================================
+   7. UNIVERSAL FLOATING BAR LAZY-LOADING STAGES (SILENT BACKGROUND ENGINE)
+   ========================================================================== */
+
+/* Keep lazy-loading stage transitions active on all floating bars without any popup pill */
+.lazy-floating-bar {
+    position: relative;
+    transition: opacity 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+                filter 0.32s ease;
+    will-change: opacity, transform;
+}
+
+/* Stage 1: Initial Skeleton Stage */
+.lazy-floating-bar.lazy-stage-loading {
+    opacity: 0.72;
+    transform: translateY(5px);
+}
+
+.lazy-floating-bar.lazy-stage-loading::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        100deg,
+        rgba(255, 255, 255, 0) 20%,
+        rgba(255, 255, 255, 0.42) 50%,
+        rgba(255, 255, 255, 0) 80%
+    );
+    background-size: 220% 100%;
+    animation: lazyFloatingBarShimmer 1.15s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 15;
+}
+
+[data-theme="dark"] .lazy-floating-bar.lazy-stage-loading::after {
+    background: linear-gradient(
+        100deg,
+        rgba(255, 255, 255, 0) 20%,
+        rgba(74, 222, 128, 0.14) 50%,
+        rgba(255, 255, 255, 0) 80%
+    );
+    background-size: 220% 100%;
+}
+
+/* Stage 2: Hydrated & Interactive Stage */
+.lazy-floating-bar.lazy-stage-ready {
+    opacity: 1;
+    transform: translateY(0);
+    filter: none;
+}
+
+@keyframes lazyFloatingBarShimmer {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+}
+
+/* Progress & Visual Bar Fill Lazy-Load Stage */
+.visual-bar-fill.lazy-bar-hold,
+.stacked-bar-segment.lazy-bar-hold {
+    width: 0% !important;
+    transition: none !important;
+}
+
+.visual-bar-fill.lazy-bar-animate,
+.stacked-bar-segment.lazy-bar-animate {
+    transition: width 0.75s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Notification Dropdown Skeleton Stage (KatokKalinis Green Palette) */
+.gnotif-skeleton-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(22, 101, 52, 0.45);
+    border-radius: 10px;
+    border: 1px solid rgba(134, 239, 172, 0.14);
+    position: relative;
+    overflow: hidden;
+}
+
+.gnotif-skeleton-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(134, 239, 172, 0.14) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: lazyFloatingBarShimmer 1.1s infinite;
+}
+
+.gnotif-skeleton-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(74, 222, 128, 0.25);
+    flex-shrink: 0;
+}
+
+.gnotif-skeleton-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.gnotif-skeleton-line {
+    height: 10px;
+    border-radius: 6px;
+    background: rgba(134, 239, 172, 0.25);
+    width: 90%;
+}
+
+.gnotif-skeleton-line.short {
+    width: 52%;
+    height: 8px;
+    background: rgba(134, 239, 172, 0.18);
+}
+
+.gnotif-lazy-more-indicator {
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #bbf7d0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+
+
 
 
 

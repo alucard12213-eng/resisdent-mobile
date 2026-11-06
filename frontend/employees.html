@@ -192,10 +192,10 @@
             <!-- Tab Switcher (Picture 2) -->
             <div class="modal-tabs">
                 <button type="button" class="modal-tab-btn active" id="tab-btn-details" onclick="switchModalTab('details')">
-                    📋 Details &amp; Credentials
+                    Details &amp; Credentials
                 </button>
                 <button type="button" class="modal-tab-btn" id="tab-btn-vehicles" onclick="switchModalTab('vehicles')">
-                    🚛 Vehicle &amp; Route Assignment
+                    Vehicle &amp; Route Assignment
                 </button>
             </div>
 
@@ -244,7 +244,7 @@
                             <div class="form-group" style="margin-bottom: 8px;">
                                 <label>Mobile No. <small style="color:var(--text-muted); font-weight:normal;">(11 digits, starts with 09)</small></label>
                                 <input type="tel" id="phone" class="form-control" placeholder="e.g. 09171234567" pattern="09[0-9]{9}" maxlength="11" minlength="11" title="Phone number must be 11 digits and start with 09" required>
-                                <span id="phone-error" style="color:#ef4444; font-size:11.5px; display:none;">⚠ Phone must be exactly 11 digits and start with 09</span>
+                                <span id="phone-error" style="color:#ef4444; font-size:11.5px; display:none;">Phone must be exactly 11 digits and start with 09</span>
                             </div>
 
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -365,7 +365,7 @@
                                             <input type="date" id="license_expiry" class="form-control" style="padding:4px 8px; font-size:11.5px; margin-top:2px;">
                                         </div>
                                         <button type="button" class="clearance-upload-btn" onclick="showToast('Driver license document staged for save.', 'success')">
-                                            <span>📎</span> Upload
+                                            Upload
                                         </button>
                                     </div>
 
@@ -379,7 +379,7 @@
                                             <input type="date" id="accreditation_expiry" class="form-control" style="padding:4px 8px; font-size:11.5px; margin-top:2px;">
                                         </div>
                                         <button type="button" class="clearance-upload-btn" onclick="showToast('CLENRO accreditation document staged.', 'success')">
-                                            <span>📎</span> Upload
+                                            Upload
                                         </button>
                                     </div>
 
@@ -393,7 +393,7 @@
                                             <input type="date" id="clearance_expiry" class="form-control" style="padding:4px 8px; font-size:11.5px; margin-top:2px;">
                                         </div>
                                         <button type="button" class="clearance-upload-btn" onclick="showToast('Police/NBI clearance staged for save.', 'success')">
-                                            <span>📎</span> Upload
+                                            Upload
                                         </button>
                                     </div>
                                 </div>
@@ -404,7 +404,7 @@
                     <!-- Collapsible Government Payroll & Bank Remittance Section (Picture 2 Bottom) -->
                     <div class="gov-bank-card">
                         <div class="gov-bank-header">
-                            <span>🏛️ Government Payroll, Remittance &amp; Bank Information</span>
+                            <span>Government Payroll, Remittance &amp; Bank Information</span>
                             <span style="font-size:11px; color:var(--green-700);">Landbank / DBP / GSIS / SSS / PhilHealth</span>
                         </div>
                         <div class="gov-bank-body">
@@ -450,13 +450,13 @@
                             <div class="form-group">
                                 <label>Primary Collection Zone / Sector</label>
                                 <select id="assigned_zone" class="form-control">
-                                    <option value="Cogon Market Commercial Zone">📍 Cogon Market Commercial Zone</option>
-                                    <option value="Carmen Market Commercial Zone">📍 Carmen Market Commercial Zone</option>
-                                    <option value="Sector North: Barangay 1–10">🏘️ Sector North (Barangay 1 to 10)</option>
-                                    <option value="Sector Central: Barangay 11–20">🏘️ Sector Central (Barangay 11 to 20)</option>
-                                    <option value="Sector East: Barangay 21–30">🏘️ Sector East (Barangay 21 to 30)</option>
-                                    <option value="Sector Commercial: Barangay 31–40">🏘️ Sector Commercial (Barangay 31 to 40)</option>
-                                    <option value="Emergency Riverbank &amp; Flood Corridor">🌊 Bitan-ag Creek &amp; Riverbank Sweep</option>
+                                    <option value="Cogon Market Commercial Zone">Cogon Market Commercial Zone</option>
+                                    <option value="Carmen Market Commercial Zone">Carmen Market Commercial Zone</option>
+                                    <option value="Sector North: Barangay 1–10">Sector North (Barangay 1 to 10)</option>
+                                    <option value="Sector Central: Barangay 11–20">Sector Central (Barangay 11 to 20)</option>
+                                    <option value="Sector East: Barangay 21–30">Sector East (Barangay 21 to 30)</option>
+                                    <option value="Sector Commercial: Barangay 31–40">Sector Commercial (Barangay 31 to 40)</option>
+                                    <option value="Emergency Riverbank &amp; Flood Corridor">Bitan-ag Creek &amp; Riverbank Sweep</option>
                                 </select>
                             </div>
                         </div>
@@ -491,7 +491,7 @@
                         Cancel
                     </button>
                     <button type="submit" class="btn" id="save-btn" style="background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; width: auto; padding: 10px 28px; font-weight: 700;">
-                        💾 Save Personnel File
+                        Save Personnel File
                     </button>
                 </div>
             </form>
@@ -732,7 +732,7 @@
                                     </div>
 
                                     <div class="emp-meta-row">
-                                        <span>📞 ${escapeHtml(item.phone || 'N/A')}</span>
+                                        <span>Tel: ${escapeHtml(item.phone || 'N/A')}</span>
                                         <span>Lic: ${escapeHtml(item.license_no || 'Standard')}</span>
                                     </div>
 
