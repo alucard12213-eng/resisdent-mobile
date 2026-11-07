@@ -1,15 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Dimensions,
-  Linking,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -22,11 +17,7 @@ import ResidentHotbar from "../components/ResidentHotbar";
 import {
   fetchPublicVendorDetail,
   fetchPublicVendors,
-  scanPublicVendorQr,
 } from "../services/resident";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const QR_BOX_SIZE = Math.min(250, SCREEN_WIDTH * 0.68);
 
 const MARKET_FILTERS = [
   { key: "all", label: "All Markets" },
@@ -95,16 +86,6 @@ export default function ResidentVendorsScreen() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
-
-  // QR Scanner Modal State
-  const [scannerVisible, setScannerVisible] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const [scanningLoading, setScanningLoading] = useState(false);
-  const [scanErrorText, setScanErrorText] = useState(null);
-  const [manualQrCode, setManualQrCode] = useState("");
-  const [showManualEntry, setShowManualEntry] = useState(Platform.OS === "web");
-  const isProcessingScanRef = useRef(false);
   const lastHandledVendorCodeRef = useRef(null);
 
   const loadVendors = useCallback(
@@ -160,7 +141,7 @@ export default function ResidentVendorsScreen() {
     return () => clearInterval(interval);
   }, [loadVendors]);
 
-  // Deep link / navigation param handler for ?vendorCode=... (from Dashboard QR Scanner) or ?scan=1
+  // Deep link / navigation param handler for ?vendorCode=...
   useEffect(() => {
     const incomingCode = params?.vendorCode ? String(params.vendorCode).trim() : "";
     if (incomingCode && lastHandledVendorCodeRef.current !== incomingCode) {
@@ -172,11 +153,6 @@ export default function ResidentVendorsScreen() {
           const res = await fetchPublicVendorDetail(incomingCode);
           if (res && res.success && res.vendor) {
             setSelectedVendor(res.vendor);
-          } else {
-            const scanRes = await scanPublicVendorQr(incomingCode);
-            if (scanRes && scanRes.success && scanRes.vendor) {
-              setSelectedVendor(scanRes.vendor);
-            }
           }
         } catch (err) {
           console.warn("Could not load vendor from vendorCode param:", err);
@@ -184,10 +160,8 @@ export default function ResidentVendorsScreen() {
           setLoadingDetail(false);
         }
       })();
-    } else if (params?.scan === "1") {
-      handleOpenQrScanner();
     }
-  }, [params?.vendorCode, params?.scan]);
+  }, [params?.vendorCode]);
 
   const handleRefresh = () => {
     try {
@@ -220,116 +194,6 @@ export default function ResidentVendorsScreen() {
     }
   };
 
-  const handleOpenQrScanner = async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    isProcessingScanRef.current = false;
-    setScanned(false);
-    setScanningLoading(false);
-    setScanErrorText(null);
-    setManualQrCode("");
-    setScannerVisible(true);
-
-    if (Platform.OS !== "web" && !permission?.granted) {
-      try {
-        await requestPermission();
-      } catch (err) {
-        console.warn("Camera permission request error:", err);
-      }
-    }
-  };
-
-  const handleOpenSettings = async () => {
-    try {
-      if (Platform.OS !== "web") {
-        await Linking.openSettings();
-      }
-    } catch (err) {
-      console.warn("Could not open device settings:", err);
-    }
-  };
-
-  const handleProcessScannedQr = async (rawCode) => {
-    const code = String(rawCode || "").trim();
-    if (!code) {
-      setScanErrorText(
-        "Please scan an official stall QR badge or enter a valid QR code."
-      );
-      return;
-    }
-    if (isProcessingScanRef.current || scanningLoading) return;
-
-    isProcessingScanRef.current = true;
-    setScanned(true);
-    setScanningLoading(true);
-    setScanErrorText(null);
-
-    try {
-      const res = await scanPublicVendorQr(code);
-      if (res && res.success && res.vendor) {
-        try {
-          await Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success
-          );
-        } catch {}
-        setScannerVisible(false);
-        setSelectedVendor(res.vendor);
-        setDetailModalVisible(true);
-      } else {
-        const msg =
-          res?.message ||
-          `No registered public market vendor matches QR code "${code}".`;
-        setScanErrorText(msg);
-        if (Platform.OS !== "web") {
-          Alert.alert("Unrecognized QR Code", msg, [
-            {
-              text: "Scan Again",
-              onPress: () => {
-                isProcessingScanRef.current = false;
-                setScanned(false);
-              },
-            },
-          ]);
-        } else {
-          isProcessingScanRef.current = false;
-          setScanned(false);
-        }
-      }
-    } catch (err) {
-      const errMsg =
-        err?.data?.message ||
-        err?.message ||
-        "Invalid, expired, or unrecognized vendor QR code.";
-      setScanErrorText(errMsg);
-      if (Platform.OS !== "web") {
-        Alert.alert("QR Verification Failed", errMsg, [
-          {
-            text: "Try Again",
-            onPress: () => {
-              isProcessingScanRef.current = false;
-              setScanned(false);
-            },
-          },
-        ]);
-      } else {
-        isProcessingScanRef.current = false;
-        setScanned(false);
-      }
-    } finally {
-      setScanningLoading(false);
-      if (Platform.OS === "web") {
-        isProcessingScanRef.current = false;
-      }
-    }
-  };
-
-  const handleCameraBarcodeScanned = ({ data }) => {
-    if (!scanned && !scanningLoading && !isProcessingScanRef.current && data) {
-      handleProcessScannedQr(data);
-    }
-  };
-
   return (
     <View style={styles.container}>
       {/* 1. TOP HEADER */}
@@ -344,21 +208,14 @@ export default function ResidentVendorsScreen() {
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            Public Market Vendors
+            Public Market Directory
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            Sanitation Grades & Public Inspection Records
+            Cogon & Carmen Public Market Records
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.scanHeaderBtn}
-          onPress={handleOpenQrScanner}
-          activeOpacity={0.85}
-        >
-          <MaterialCommunityIcons name="qrcode-scan" size={17} color="#FFFFFF" />
-          <Text style={styles.scanHeaderBtnText}>Scan QR</Text>
-        </TouchableOpacity>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
@@ -964,183 +821,8 @@ export default function ResidentVendorsScreen() {
         </View>
       </Modal>
 
-      {/* ====================================================================
-          MODAL 2: OFFICIAL VENDOR QR BADGE SCANNER
-          ==================================================================== */}
-      <Modal
-        visible={scannerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setScannerVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.scannerModalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>Scan Vendor QR Badge</Text>
-                <Text style={styles.scannerModalSub}>
-                  Align the official stall QR badge inside the frame
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.closeModalBtn}
-                onPress={() => setScannerVisible(false)}
-              >
-                <MaterialCommunityIcons name="close" size={22} color="#1E331B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: "center", paddingTop: 10 }}
-            >
-              {/* Camera QR Box */}
-              {!showManualEntry && (
-                <View style={styles.qrCameraBox}>
-                  {scanningLoading ? (
-                    <View style={styles.permissionBox}>
-                      <ActivityIndicator size="large" color="#2E7D32" />
-                      <Text style={styles.permissionText}>
-                        Verifying vendor QR badge...
-                      </Text>
-                    </View>
-                  ) : permission?.granted ? (
-                    <CameraView
-                      style={StyleSheet.absoluteFill}
-                      barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                      onBarcodeScanned={
-                        scanned ? undefined : handleCameraBarcodeScanned
-                      }
-                    />
-                  ) : (
-                    <View style={styles.permissionBox}>
-                      <MaterialCommunityIcons
-                        name="camera-off-outline"
-                        size={40}
-                        color="#2E7D32"
-                      />
-                      <Text style={styles.permissionTitle}>
-                        Camera Access Required
-                      </Text>
-                      <Text style={styles.permissionText}>
-                        KatokKalinis needs camera permission to scan official
-                        public market stall QR badges.
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.permissionBtn}
-                        onPress={requestPermission}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.permissionBtnText}>
-                          Request Permission Again
-                        </Text>
-                      </TouchableOpacity>
-                      {Platform.OS !== "web" && (
-                        <TouchableOpacity
-                          style={styles.settingsLinkBtn}
-                          onPress={handleOpenSettings}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.settingsLinkBtnText}>
-                            Open Device Settings
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {scanErrorText ? (
-                <View style={styles.scanErrorBanner}>
-                  <MaterialCommunityIcons
-                    name="alert-circle-outline"
-                    size={16}
-                    color="#C62828"
-                  />
-                  <Text style={styles.scanErrorBannerText}>{scanErrorText}</Text>
-                </View>
-              ) : null}
-
-              {/* Manual / QR Token Lookup Input */}
-              <View style={styles.manualLookupSection}>
-                <Text style={styles.manualLookupLabel}>
-                  Or enter an official Stall QR Code / Vendor Code:
-                </Text>
-                <View style={styles.manualInputRow}>
-                  <MaterialCommunityIcons
-                    name="qrcode"
-                    size={20}
-                    color="#2E7D32"
-                  />
-                  <TextInput
-                    style={styles.manualTextInput}
-                    placeholder="Enter scanned QR token or vendor code..."
-                    placeholderTextColor="#9AA998"
-                    value={manualQrCode}
-                    onChangeText={(val) => {
-                      setManualQrCode(val);
-                      if (scanErrorText) setScanErrorText(null);
-                    }}
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.verifyQrBtn,
-                    (!manualQrCode.trim() || scanningLoading) && {
-                      opacity: 0.65,
-                    },
-                  ]}
-                  onPress={() => handleProcessScannedQr(manualQrCode)}
-                  disabled={!manualQrCode.trim() || scanningLoading}
-                >
-                  <MaterialCommunityIcons
-                    name="qrcode-scan"
-                    size={18}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.verifyQrBtnText}>
-                    {scanningLoading
-                      ? "Verifying QR Badge..."
-                      : "Verify Vendor QR Badge"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {Platform.OS !== "web" && (
-                <TouchableOpacity
-                  style={styles.toggleModeLink}
-                  onPress={() => setShowManualEntry(!showManualEntry)}
-                >
-                  <Text style={styles.toggleModeLinkText}>
-                    {showManualEntry
-                      ? "Switch to Camera Scanner"
-                      : "Hide Camera Scanner"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={styles.scannerBackBtn}
-                onPress={() => setScannerVisible(false)}
-                activeOpacity={0.85}
-              >
-                <MaterialCommunityIcons
-                  name="arrow-left"
-                  size={16}
-                  color="#1E331B"
-                />
-                <Text style={styles.scannerBackBtnText}>Back to Vendors</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       {/* RESIDENT 5-TAB BOTTOM HOTBAR */}
-      <ResidentHotbar activeTab="vendors" />
+      <ResidentHotbar />
     </View>
   );
 }
@@ -1753,147 +1435,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "800",
-  },
-
-  /* QR SCANNER STYLES */
-  qrCameraBox: {
-    width: QR_BOX_SIZE,
-    height: QR_BOX_SIZE,
-    borderRadius: 20,
-    backgroundColor: "#E8F8EE",
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#2E7D32",
-    marginBottom: 14,
-  },
-  permissionBox: {
-    padding: 18,
-    alignItems: "center",
-  },
-  permissionTitle: {
-    fontSize: 13.5,
-    fontWeight: "800",
-    color: "#1E331B",
-    marginTop: 8,
-  },
-  permissionText: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: "#4A6E46",
-    textAlign: "center",
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  permissionBtn: {
-    marginTop: 10,
-    backgroundColor: "#2E7D32",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  permissionBtnText: {
-    color: "#FFFFFF",
-    fontSize: 11.5,
-    fontWeight: "800",
-  },
-  settingsLinkBtn: {
-    marginTop: 6,
-    paddingVertical: 4,
-  },
-  settingsLinkBtnText: {
-    color: "#2E7D32",
-    fontSize: 11.5,
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
-  scanErrorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    width: "100%",
-    backgroundColor: "#FFEBEE",
-    borderWidth: 1,
-    borderColor: "#FFCDD2",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 10,
-  },
-  scanErrorBannerText: {
-    flex: 1,
-    fontSize: 11.5,
-    color: "#B71C1C",
-    fontWeight: "700",
-  },
-  manualLookupSection: {
-    width: "100%",
-    marginTop: 4,
-  },
-  manualLookupLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#384E35",
-    marginBottom: 6,
-  },
-  manualInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F7FAF6",
-    borderWidth: 1.2,
-    borderColor: "#CFE2CC",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  manualTextInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    color: "#1E331B",
-    fontWeight: "600",
-  },
-  verifyQrBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#2E7D32",
-    borderRadius: 14,
-    paddingVertical: 12,
-    marginTop: 10,
-  },
-  verifyQrBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13.5,
-    fontWeight: "800",
-  },
-  toggleModeLink: {
-    marginTop: 12,
-    padding: 6,
-  },
-  toggleModeLinkText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2E7D32",
-    textDecorationLine: "underline",
-  },
-  scannerBackBtn: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#F2F7F1",
-    width: "100%",
-  },
-  scannerBackBtnText: {
-    fontSize: 12.5,
-    fontWeight: "800",
-    color: "#1E331B",
   },
 });

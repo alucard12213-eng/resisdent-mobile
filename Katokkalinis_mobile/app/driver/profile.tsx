@@ -210,8 +210,8 @@ export default function DriverProfile() {
               <MaterialCommunityIcons name="map-marker-path" size={22} color="#1976D2" />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.dutyMainText}>Cagayan de Oro Route Cluster 1</Text>
-              <Text style={styles.dutySubText}>Barangay 1, 2, 3, 4 (Mon • Wed • Fri)</Text>
+              <Text style={styles.dutyMainText}>Compactor Route #04 • South Poblacion</Text>
+              <Text style={styles.dutySubText}>Barangays 31 to 40 (Mon • Wed • Fri | 08:00 AM – 11:00 AM)</Text>
             </View>
           </View>
         </View>
@@ -292,7 +292,7 @@ export default function DriverProfile() {
         <TouchableOpacity
           style={styles.navItem}
           activeOpacity={0.8}
-          onPress={() => router.push("/schedule")}
+          onPress={() => router.push("/driver/dashboard" as any)}
         >
           <MaterialCommunityIcons name="truck-fast" size={24} color="#7A8D78" />
           <Text style={styles.navItemText}>Collection</Text>

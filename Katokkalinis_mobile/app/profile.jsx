@@ -44,7 +44,7 @@ export default function Profile() {
   // Vendor specific fields (dynamically loaded from backend)
   const [vendorId, setVendorId] = useState("VEN-2026012345");
   const [stallNumber, setStallNumber] = useState("Stall #14, Section B");
-  const [marketLocation, setMarketLocation] = useState("Divisoria Public Market");
+  const [marketLocation, setMarketLocation] = useState("Cogon Public Market");
   const [businessType, setBusinessType] = useState("Fresh Produce & Food Stall");
   const [sanitationScore, setSanitationScore] = useState("0.0");
   const [complianceScore, setComplianceScore] = useState("0%");
@@ -144,7 +144,9 @@ export default function Profile() {
           if (res.user.vendor) {
             const v = res.user.vendor;
             if (v.stall_number) setStallNumber(v.stall_number);
-            if (v.market) setMarketLocation(v.market);
+            if (v.market) {
+              setMarketLocation(/divi/i.test(v.market) ? "Cogon Public Market" : v.market);
+            }
             if (v.business_name) setBusinessType(v.business_name);
             if (v.vendor_code) setVendorId(`VEN-${v.vendor_code}`);
 

@@ -26,7 +26,7 @@ export default function VendorQrScreen() {
   const [vendorName, setVendorName] = useState("Katok Vendor");
   const [vendorCode, setVendorCode] = useState("2026012345");
   const [stallNumber, setStallNumber] = useState("Stall #12");
-  const [marketLocation, setMarketLocation] = useState("Divisoria Public Market");
+  const [marketLocation, setMarketLocation] = useState("Cogon Public Market");
   const [avatarUri, setAvatarUri] = useState(null);
 
   // Single Source of Truth Evaluation State
@@ -71,7 +71,8 @@ export default function VendorQrScreen() {
           setStallNumber(statusRes.user.vendor.stall_number);
         }
         if (statusRes.user.vendor?.market) {
-          setMarketLocation(statusRes.user.vendor.market);
+          const m = statusRes.user.vendor.market;
+          setMarketLocation(/divi/i.test(m) ? "Cogon Public Market" : m);
         }
         if (statusRes.user.avatar || statusRes.user.avatar_url) {
           const resolved = resolveMediaUrl(statusRes.user.avatar_url || statusRes.user.avatar);

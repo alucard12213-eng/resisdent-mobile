@@ -109,7 +109,7 @@ export default function WelcomeScreen() {
                 </View>
               </View>
               <Text style={styles.cardDescription}>
-                Track collection trucks in real-time, view barangay pickup schedules, and report waste issues.
+                View barangay pickup schedules, check waste segregation guidelines, and report sanitation issues.
               </Text>
             </View>
           </LinearGradient>

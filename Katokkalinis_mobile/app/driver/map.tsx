@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -9,52 +10,100 @@ import {
   View,
 } from "react-native";
 import KatokLogo from "../../components/KatokLogo";
-import LiveRouteMapView from "../../components/LiveRouteMapView";
 import TopNotificationBanner from "../../components/TopNotificationBanner";
 import { BarangayItem, getBarangays1to40 } from "../../services/driver";
-import {
-  addLocationListener,
-  getLastRecordedLocation,
-  isAutomaticRecordingActive,
-  LiveLocationState,
-  startAutomaticLocationRecording,
-} from "../../services/locationService";
+
+interface RouteCorridorMeta {
+  id: 1 | 2 | 3 | 4;
+  code: string;
+  name: string;
+  truck: string;
+  rangeLabel: string;
+  startBrgy: number;
+  endBrgy: number;
+  scheduleDays: string;
+  scheduleWindow: string;
+  color: string;
+  coverage: string;
+}
+
+const ROUTE_CORRIDORS: RouteCorridorMeta[] = [
+  {
+    id: 1,
+    code: "R1",
+    name: "North Poblacion Corridor",
+    truck: "KAL-101",
+    rangeLabel: "Barangays 1 to 10",
+    startBrgy: 1,
+    endBrgy: 10,
+    scheduleDays: "Mon • Wed • Fri",
+    scheduleWindow: "06:00 AM – 09:00 AM",
+    color: "#2E7D32",
+    coverage:
+      "City Health, Fernandez St., Burgos, Macabalan Port Access, Gaabucayan (Barangays 1–10).",
+  },
+  {
+    id: 2,
+    code: "R2",
+    name: "Central Poblacion & Cogon Corridor",
+    truck: "KAL-102",
+    rangeLabel: "Barangays 11 to 20",
+    startBrgy: 11,
+    endBrgy: 20,
+    scheduleDays: "Tue • Thu • Sat",
+    scheduleWindow: "07:00 AM – 10:00 AM",
+    color: "#1976D2",
+    coverage:
+      "Tirso Neri, JR Borja, Cogon Public Market Periphery, Commercial District (Barangays 11–20).",
+  },
+  {
+    id: 3,
+    code: "R3",
+    name: "East Poblacion Corridor",
+    truck: "KAL-103",
+    rangeLabel: "Barangays 21 to 30",
+    startBrgy: 21,
+    endBrgy: 30,
+    scheduleDays: "Tue • Thu • Sat",
+    scheduleWindow: "08:00 AM – 11:00 AM",
+    color: "#F57C00",
+    coverage:
+      "Agora Access, Provincial Capitol Perimeter, Velez Central, Daumar St. (Barangays 21–30).",
+  },
+  {
+    id: 4,
+    code: "R4",
+    name: "South Poblacion & Market Link",
+    truck: "KAL-104",
+    rangeLabel: "Barangays 31 to 40",
+    startBrgy: 31,
+    endBrgy: 40,
+    scheduleDays: "Mon • Wed • Fri",
+    scheduleWindow: "08:00 AM – 11:00 AM",
+    color: "#7B1FA2",
+    coverage:
+      "Cogon Public Market South Bay, City Hall & Gaston Park, Carmen Public Market Bridge Approach (Barangays 31–40).",
+  },
+];
+
+const CLEARED_STOPS_STORAGE_KEY = "driver_cleared_stops_v1";
 
 export default function DriverMap() {
   const router = useRouter();
   const [barangays, setBarangays] = useState<BarangayItem[]>([]);
-  const [selectedRouteId, setSelectedRouteId] = useState<number | "all">(4);
-  const [liveGps, setLiveGps] = useState<LiveLocationState | null>(
-    getLastRecordedLocation()
-  );
+  const [selectedRouteId, setSelectedRouteId] = useState<1 | 2 | 3 | 4 | "all">(4);
+  const [clearedStops, setClearedStops] = useState<Record<string, boolean>>({});
   const [banner, setBanner] = useState({
     visible: true,
-    title: "Collection Schedule • Sector 4 Active",
+    title: "Assigned Collection Corridors • Barangays 1–40",
     message:
-      "Interactive live map covering CDO Urban Pilot Barangays 1 to 40.",
+      "Review scheduled pickup windows and mark barangay collection stops along your assigned CDO route.",
     type: "truck" as "truck" | "info" | "success",
   });
 
   useEffect(() => {
     loadBarangays();
-
-    if (isAutomaticRecordingActive()) {
-      const loc = getLastRecordedLocation();
-      const coordStr = loc
-        ? `[${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}]`
-        : "";
-      setBanner({
-        visible: true,
-        title: "Live GPS Telemetry Active • Truck KAL-104",
-        message: `Automatic route recording is streaming live ${coordStr} to the Superadmin Dashboard.`,
-        type: "truck",
-      });
-    }
-
-    const unsubscribe = addLocationListener((state) => {
-      setLiveGps(state);
-    });
-    return () => unsubscribe();
+    loadClearedStops();
   }, []);
 
   const loadBarangays = async () => {
@@ -66,24 +115,43 @@ export default function DriverMap() {
     }
   };
 
-  const handleEnsureGpsActive = () => {
-    if (!isAutomaticRecordingActive()) {
-      startAutomaticLocationRecording({ plateNumber: "KAL-104" }).catch(
-        () => {}
-      );
-      setBanner({
-        visible: true,
-        title: "Live GPS Recording Started • KAL-104",
-        message:
-          "Broadcasting real-time truck coordinates to Superadmin & Monitor Truck maps.",
-        type: "success",
-      });
-    }
+  const loadClearedStops = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(CLEARED_STOPS_STORAGE_KEY);
+      if (raw) {
+        setClearedStops(JSON.parse(raw));
+      }
+    } catch {}
   };
+
+  const toggleStopCleared = async (brgyName: string) => {
+    const updated = {
+      ...clearedStops,
+      [brgyName]: !clearedStops[brgyName],
+    };
+    setClearedStops(updated);
+    try {
+      await AsyncStorage.setItem(CLEARED_STOPS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const activeRouteMeta =
+    selectedRouteId === "all"
+      ? ROUTE_CORRIDORS[3]
+      : ROUTE_CORRIDORS.find((r) => r.id === selectedRouteId) || ROUTE_CORRIDORS[3];
+
+  const routeStops = barangays.filter((b) => {
+    const num = Number(b.number || b.id);
+    if (selectedRouteId === "all") return num >= 1 && num <= 40;
+    return num >= activeRouteMeta.startBrgy && num <= activeRouteMeta.endBrgy;
+  });
+
+  const clearedInViewCount = routeStops.filter(
+    (b) => clearedStops[b.name] || (b.today_logs_count && b.today_logs_count > 0)
+  ).length;
 
   return (
     <View style={styles.container}>
-      {/* Top Banner */}
       <TopNotificationBanner
         visible={banner.visible}
         title={banner.title}
@@ -100,29 +168,15 @@ export default function DriverMap() {
             onPress={() => router.back()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <MaterialCommunityIcons
-              name="arrow-left"
-              size={24}
-              color="#1E331B"
-            />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#1E331B" />
           </TouchableOpacity>
           <KatokLogo variant="header" showTagline={false} />
         </View>
 
-        <TouchableOpacity
-          style={styles.truckActiveBadge}
-          onPress={handleEnsureGpsActive}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons
-            name="satellite-uplink"
-            size={14}
-            color="#2E7D32"
-          />
-          <Text style={styles.truckActiveText}>
-            {liveGps?.isRecording ? "Live GPS On" : "Start Live GPS"}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.truckActiveBadge}>
+          <MaterialCommunityIcons name="truck-check" size={14} color="#2E7D32" />
+          <Text style={styles.truckActiveText}>KAL-104 • Route #04</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -131,29 +185,25 @@ export default function DriverMap() {
       >
         {/* 2. TITLE SECTION */}
         <View style={styles.titleSection}>
-          <Text style={styles.pageTitle}>Live Route & GPS Map</Text>
+          <Text style={styles.pageTitle}>Assigned Routes & Stops</Text>
           <Text style={styles.pageSubtitle}>
-            Real-Time Truck Location & Designated Collection Corridors • Barangays 1 to 40
+            Scheduled Collection Corridors • CDO Urban Barangays 1 to 40 & Public Markets
           </Text>
         </View>
 
-        {/* 3. INTERACTIVE LIVE ROUTE & TRUCK GPS MAP MODULE */}
-        <View style={styles.mapCard}>
-          <View style={styles.mapCardHeader}>
-            <View style={styles.mapCardTitleRow}>
-              <MaterialCommunityIcons
-                name="map-Search-outline"
-                size={18}
-                color="#15803D"
-              />
-              <Text style={styles.mapCardTitle}>
-                Live Fleet GPS Telemetry (KAL-104)
+        {/* 3. ASSIGNED CORRIDOR & BARANGAY STOPS MODULE */}
+        <View style={styles.corridorCard}>
+          <View style={styles.corridorCardHeader}>
+            <View style={styles.corridorCardTitleRow}>
+              <MaterialCommunityIcons name="map-marker-path" size={18} color="#15803D" />
+              <Text style={styles.corridorCardTitle}>
+                {selectedRouteId === "all"
+                  ? "All Pilot Corridors (Barangays 1–40)"
+                  : `${activeRouteMeta.name} (${activeRouteMeta.truck})`}
               </Text>
             </View>
-            <Text style={styles.mapPingsCount}>
-              {liveGps?.pingsCount
-                ? `${liveGps.pingsCount} pings synced`
-                : "Synced with Web"}
+            <Text style={styles.stopsProgressPill}>
+              {clearedInViewCount}/{routeStops.length || (selectedRouteId === "all" ? 40 : 10)} Cleared
             </Text>
           </View>
 
@@ -164,11 +214,11 @@ export default function DriverMap() {
             contentContainerStyle={styles.filterPillsRow}
           >
             {[
-              { id: "all" as const, label: "All Routes (1–4)", color: "#15803D" },
-              { id: 4 as const, label: "R4 South • KAL-104 (You)", color: "#7B1FA2" },
+              { id: 4 as const, label: "R4 South • KAL-104 (Assigned)", color: "#7B1FA2" },
               { id: 1 as const, label: "R1 North • KAL-101", color: "#2E7D32" },
               { id: 2 as const, label: "R2 Central • KAL-102", color: "#1976D2" },
               { id: 3 as const, label: "R3 East • KAL-103", color: "#F57C00" },
+              { id: "all" as const, label: "All Pilot Stops (1–40)", color: "#15803D" },
             ].map((tab) => {
               const isSelected = selectedRouteId === tab.id;
               return (
@@ -197,193 +247,133 @@ export default function DriverMap() {
             })}
           </ScrollView>
 
-          {/* Embedded Interactive Map */}
-          <LiveRouteMapView
-            height={320}
-            selectedRouteId={selectedRouteId}
-            compact={false}
-          />
-
-          {/* Live Coordinates & Speed Strip */}
-          <View style={styles.telemetryStrip}>
-            <View style={styles.telemetryCol}>
-              <Text style={styles.telemetryLabel}>CURRENT COORDINATES</Text>
-              <Text style={styles.telemetryValue}>
-                {liveGps
-                  ? `${liveGps.latitude.toFixed(5)}, ${liveGps.longitude.toFixed(5)}`
-                  : "8.47520, 124.65120"}
+          {/* Schedule Summary Strip */}
+          <View style={styles.scheduleSummaryBox}>
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>COLLECTION DAYS</Text>
+              <Text style={styles.scheduleValue}>
+                {selectedRouteId === "all" ? "Mon – Sat Roster" : activeRouteMeta.scheduleDays}
               </Text>
             </View>
-            <View style={styles.telemetryCol}>
-              <Text style={styles.telemetryLabel}>SPEED</Text>
-              <Text style={styles.telemetryValue}>
-                {liveGps?.speed ? `${liveGps.speed} km/h` : "18.5 km/h"}
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>TIME WINDOW</Text>
+              <Text style={styles.scheduleValue}>
+                {selectedRouteId === "all" ? "06:00 AM – 11:00 AM" : activeRouteMeta.scheduleWindow}
               </Text>
             </View>
-            <View style={styles.telemetryCol}>
-              <Text style={styles.telemetryLabel}>ACTIVE SECTOR</Text>
-              <Text style={[styles.telemetryValue, { color: "#15803D" }]}>
-                {liveGps?.currentSectorName || "Brgy 31–40 South"}
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>COVERAGE</Text>
+              <Text style={[styles.scheduleValue, { color: "#15803D" }]}>
+                {selectedRouteId === "all" ? "Brgy 1–40" : activeRouteMeta.rangeLabel}
               </Text>
             </View>
           </View>
+
+          {/* Barangay Stops Checklist */}
+          <Text style={styles.stopsSubheading}>
+            Designated Barangay Pickup Stops (Tap stop to mark cleared)
+          </Text>
+          <View style={styles.stopsGrid}>
+            {routeStops.slice(0, selectedRouteId === "all" ? 20 : 10).map((b) => {
+              const isDone =
+                Boolean(clearedStops[b.name]) ||
+                Boolean(b.today_logs_count && b.today_logs_count > 0);
+              return (
+                <TouchableOpacity
+                  key={b.id}
+                  style={[styles.stopChip, isDone && styles.stopChipDone]}
+                  onPress={() => toggleStopCleared(b.name)}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons
+                    name={isDone ? "check-circle" : "checkbox-blank-circle-outline"}
+                    size={15}
+                    color={isDone ? "#2E7D32" : "#7A8D78"}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.stopChipTitle, isDone && styles.stopChipTitleDone]}
+                      numberOfLines={1}
+                    >
+                      {b.name}
+                    </Text>
+                    <Text style={styles.stopChipMeta}>
+                      {b.today_collected_tons && b.today_collected_tons > 0
+                        ? `${b.today_collected_tons} tons logged`
+                        : isDone
+                        ? "Stop Cleared"
+                        : "Scheduled Stop"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {selectedRouteId === "all" && routeStops.length > 20 && (
+            <Text style={styles.moreStopsNote}>
+              Showing first 20 of 40 urban barangays. Select R1–R4 above to inspect each 10-barangay sector.
+            </Text>
+          )}
         </View>
 
         {/* 4. ROUTE DIRECTORY (BARANGAY 1 TO 40) */}
         <Text style={styles.sectionTitle}>
-          Garbage Truck Fleet Routes (Tap to Focus on Map)
+          CLENRO Pilot Fleet Corridors (Barangays 1 to 40)
         </Text>
 
         <View style={styles.routeCardList}>
-          {/* Route 1 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRouteId(1)}
-            style={[
-              styles.routeCard,
-              { borderLeftColor: "#2E7D32" },
-              selectedRouteId === 1 && styles.routeCardSelected,
-            ]}
-          >
-            <View style={styles.routeCardHeader}>
-              <View
-                style={[styles.routeNumBadge, { backgroundColor: "#2E7D32" }]}
+          {ROUTE_CORRIDORS.map((route) => {
+            const isSelected = selectedRouteId === route.id;
+            const isAssigned = route.id === 4;
+            return (
+              <TouchableOpacity
+                key={route.id}
+                activeOpacity={0.85}
+                onPress={() => setSelectedRouteId(route.id)}
+                style={[
+                  styles.routeCard,
+                  { borderLeftColor: route.color },
+                  isSelected && styles.routeCardSelected,
+                ]}
               >
-                <Text style={styles.routeNumText}>R1</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.routeCardTitle}>North Poblacion</Text>
-                <Text style={styles.routeCardSub}>
-                  Barangays 1 to 10 • Truck KAL-101
-                </Text>
-              </View>
-              <View style={styles.activeTag}>
-                <Text style={styles.activeTagText}>View on Map</Text>
-              </View>
-            </View>
-            <Text style={styles.routeCoverage}>
-              Coverage: City Health, Fernandez, Burgos, Port Access, Gaabucayan
-              ({barangays.length > 0 ? "10 Stops Synced" : "Barangays 1–10"}).
-            </Text>
-          </TouchableOpacity>
-
-          {/* Route 2 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRouteId(2)}
-            style={[
-              styles.routeCard,
-              { borderLeftColor: "#1976D2" },
-              selectedRouteId === 2 && styles.routeCardSelected,
-            ]}
-          >
-            <View style={styles.routeCardHeader}>
-              <View
-                style={[styles.routeNumBadge, { backgroundColor: "#1976D2" }]}
-              >
-                <Text style={styles.routeNumText}>R2</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.routeCardTitle}>Central Poblacion</Text>
-                <Text style={styles.routeCardSub}>
-                  Barangays 11 to 20 • Truck KAL-102
-                </Text>
-              </View>
-              <View style={styles.activeTag}>
-                <Text style={styles.activeTagText}>View on Map</Text>
-              </View>
-            </View>
-            <Text style={styles.routeCoverage}>
-              Coverage: Tirso Neri Heritage, JR Borja, Cogon Market Periphery,
-              Limketkai.
-            </Text>
-          </TouchableOpacity>
-
-          {/* Route 3 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRouteId(3)}
-            style={[
-              styles.routeCard,
-              { borderLeftColor: "#F57C00" },
-              selectedRouteId === 3 && styles.routeCardSelected,
-            ]}
-          >
-            <View style={styles.routeCardHeader}>
-              <View
-                style={[styles.routeNumBadge, { backgroundColor: "#F57C00" }]}
-              >
-                <Text style={styles.routeNumText}>R3</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.routeCardTitle}>East Poblacion</Text>
-                <Text style={styles.routeCardSub}>
-                  Barangays 21 to 30 • Truck KAL-103
-                </Text>
-              </View>
-              <View style={styles.activeTag}>
-                <Text style={styles.activeTagText}>View on Map</Text>
-              </View>
-            </View>
-            <Text style={styles.routeCoverage}>
-              Coverage: Agora Terminal, Provincial Capitol, Velez Central,
-              Daumar St.
-            </Text>
-          </TouchableOpacity>
-
-          {/* Route 4 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRouteId(4)}
-            style={[
-              styles.routeCard,
-              { borderLeftColor: "#7B1FA2" },
-              selectedRouteId === 4 && styles.routeCardSelected,
-            ]}
-          >
-            <View style={styles.routeCardHeader}>
-              <View
-                style={[styles.routeNumBadge, { backgroundColor: "#7B1FA2" }]}
-              >
-                <Text style={styles.routeNumText}>R4</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.routeCardTitle}>South Poblacion</Text>
-                <Text style={styles.routeCardSub}>
-                  Barangays 31 to 40 • Truck KAL-104 (Your Truck)
-                </Text>
-              </View>
-              <View
-                style={[styles.activeTag, { backgroundColor: "#E8F8EE" }]}
-              >
-                <Text style={[styles.activeTagText, { color: "#2E7D32" }]}>
-                  Your Run
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.routeCoverage}>
-              Coverage: Cogon Market Central Bay, City Hall & Gaston Park,
-              Carmen Bridge Approach, Riverbank.
-            </Text>
-          </TouchableOpacity>
+                <View style={styles.routeCardHeader}>
+                  <View style={[styles.routeNumBadge, { backgroundColor: route.color }]}>
+                    <Text style={styles.routeNumText}>{route.code}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.routeCardTitle}>{route.name}</Text>
+                    <Text style={styles.routeCardSub}>
+                      {route.rangeLabel} • Truck {route.truck} • {route.scheduleDays}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.activeTag,
+                      isAssigned && { backgroundColor: "#E8F8EE" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.activeTagText,
+                        isAssigned && { color: "#2E7D32" },
+                      ]}
+                    >
+                      {isAssigned ? "Your Run" : "View Stops"}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.routeCoverage}>Coverage: {route.coverage}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
 
       {/* 5. BOTTOM NAVIGATION */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          activeOpacity={0.8}
-          onPress={() => {}}
-        >
-          <MaterialCommunityIcons
-            name="map-marker-distance"
-            size={24}
-            color="#2E7D32"
-          />
-          <Text style={[styles.navItemText, styles.navItemTextActive]}>
-            Route
-          </Text>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.8} onPress={() => {}}>
+          <MaterialCommunityIcons name="map-marker-distance" size={24} color="#2E7D32" />
+          <Text style={[styles.navItemText, styles.navItemTextActive]}>Route</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -391,11 +381,7 @@ export default function DriverMap() {
           activeOpacity={0.8}
           onPress={() => router.push("/driver/dashboard" as any)}
         >
-          <MaterialCommunityIcons
-            name="truck-fast"
-            size={24}
-            color="#7A8D78"
-          />
+          <MaterialCommunityIcons name="truck-fast" size={24} color="#7A8D78" />
           <Text style={styles.navItemText}>Collection</Text>
         </TouchableOpacity>
 
@@ -404,11 +390,7 @@ export default function DriverMap() {
           activeOpacity={0.8}
           onPress={() => router.push("/driver/profile" as any)}
         >
-          <MaterialCommunityIcons
-            name="account-outline"
-            size={24}
-            color="#7A8D78"
-          />
+          <MaterialCommunityIcons name="account-outline" size={24} color="#7A8D78" />
           <Text style={styles.navItemText}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -480,7 +462,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: "500",
   },
-  mapCard: {
+  corridorCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     padding: 12,
@@ -493,29 +475,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  mapCardHeader: {
+  corridorCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
+    gap: 8,
   },
-  mapCardTitleRow: {
+  corridorCardTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flex: 1,
   },
-  mapCardTitle: {
-    fontSize: 13,
+  corridorCardTitle: {
+    fontSize: 12.5,
     fontWeight: "800",
     color: "#1E331B",
+    flexShrink: 1,
   },
-  mapPingsCount: {
+  stopsProgressPill: {
     fontSize: 10.5,
     fontWeight: "700",
     color: "#15803D",
     backgroundColor: "#DCFCE7",
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 999,
   },
   filterPillsRow: {
@@ -536,31 +521,79 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#435941",
   },
-  telemetryStrip: {
+  scheduleSummaryBox: {
     flexDirection: "row",
     justifyContent: "space-between",
     backgroundColor: "#F4FBF6",
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 10,
-    marginTop: 10,
     borderWidth: 1,
     borderColor: "#D1FAE5",
   },
-  telemetryCol: {
+  scheduleCol: {
     flex: 1,
   },
-  telemetryLabel: {
+  scheduleLabel: {
     fontSize: 8.5,
     fontWeight: "800",
     color: "#688264",
     letterSpacing: 0.4,
   },
-  telemetryValue: {
-    fontSize: 11,
+  scheduleValue: {
+    fontSize: 10.5,
     fontWeight: "800",
     color: "#0F172A",
-    marginTop: 1,
+    marginTop: 2,
+  },
+  stopsSubheading: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#3F563E",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  stopsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  stopChip: {
+    width: "48.5%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#F8FAF8",
+    borderWidth: 1,
+    borderColor: "#E2ECE1",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 9,
+  },
+  stopChipDone: {
+    backgroundColor: "#ECFDF3",
+    borderColor: "#A7F3D0",
+  },
+  stopChipTitle: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#1E331B",
+  },
+  stopChipTitleDone: {
+    color: "#166534",
+  },
+  stopChipMeta: {
+    fontSize: 9.5,
+    color: "#688264",
+    fontWeight: "600",
+  },
+  moreStopsNote: {
+    fontSize: 10,
+    color: "#688264",
+    marginTop: 8,
+    textAlign: "center",
+    fontStyle: "italic",
   },
   sectionTitle: {
     fontSize: 14,

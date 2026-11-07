@@ -23,10 +23,10 @@ const fallbackReports = [
   {
     id: "1",
     name: "Jane Doe",
-    location: "Barangay 4 Public Market",
+    location: "Barangay 4, Cagayan de Oro",
     time: "1 hour ago",
     status: "In Progress",
-    text: "Uncollected commercial waste pile accumulating near vendor fruit stalls. Needs immediate compactor pickup.",
+    text: "Uncollected waste bags accumulating along the designated barangay roadside pickup point. Needs compactor clearing.",
     imageUrl: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=600&q=80",
     avatar: null,
     category: "Uncollected Waste",
@@ -34,22 +34,22 @@ const fallbackReports = [
   {
     id: "2",
     name: "John Doe",
-    location: "Zone 2 Residential Area",
+    location: "Barangay 12, Cagayan de Oro",
     time: "2 days ago",
     status: "Resolved",
-    text: "Missed scheduled garbage collection on Wednesday morning. Driver arrived and completed clearing yesterday.",
+    text: "Missed scheduled garbage collection on Wednesday morning. Assigned compactor unit returned and completed clearing.",
     avatar: null,
-    category: "Missed Pickup",
+    category: "Missed Schedules",
   },
   {
     id: "3",
     name: "Maria Santos",
-    location: "Barangay 1 Poblacion",
+    location: "Barangay 1, Cagayan de Oro",
     time: "4 days ago",
     status: "Resolved",
-    text: "Damaged municipal waste bin replaced with a new segregated container.",
+    text: "Damaged roadside waste receptacle replaced with a new color-coded segregated container.",
     avatar: null,
-    category: "Damaged Bin",
+    category: "Other Sanitation Concerns",
   },
 ];
 
@@ -213,7 +213,7 @@ export default function Report() {
             </Text>
             <TouchableOpacity
               style={styles.emptyActionButton}
-              onPress={() => router.push("/add-report")}
+              onPress={() => router.push("/post")}
               activeOpacity={0.85}
             >
               <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />

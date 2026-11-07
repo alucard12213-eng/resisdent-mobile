@@ -25,7 +25,7 @@ export default function VendorDashboard() {
   const [vendorName, setVendorName] = useState("Katok Vendor");
   const [vendorCode, setVendorCode] = useState("2026012345");
   const [stallNumber, setStallNumber] = useState("Stall #12");
-  const [marketLocation, setMarketLocation] = useState("Divisoria Public Market");
+  const [marketLocation, setMarketLocation] = useState("Cogon Public Market");
   const [avatarUri, setAvatarUri] = useState(null);
 
   // Single Source of Truth Evaluation State
@@ -83,7 +83,8 @@ export default function VendorDashboard() {
           setStallNumber(statusRes.user.vendor.stall_number);
         }
         if (statusRes.user.vendor?.market) {
-          setMarketLocation(statusRes.user.vendor.market);
+          const m = statusRes.user.vendor.market;
+          setMarketLocation(/divi/i.test(m) ? "Cogon Public Market" : m);
         }
         if (statusRes.user.avatar || statusRes.user.avatar_url) {
           const resolved = resolveMediaUrl(statusRes.user.avatar_url || statusRes.user.avatar);
@@ -300,6 +301,44 @@ export default function VendorDashboard() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.quickActionsGrid}>
+          {/* Action 4: Inspection Notices & Market Advisories */}
+          <TouchableOpacity
+            style={styles.actionGridCard}
+            activeOpacity={0.85}
+            onPress={() => router.push("/notifications")}
+            accessibilityRole="button"
+            accessibilityLabel="Open Market Advisories and Notices"
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: "#FFF8E1" }]}>
+              <MaterialCommunityIcons
+                name="bell-ring-outline"
+                size={24}
+                color="#F57F17"
+              />
+            </View>
+            <Text style={styles.actionLabel}>Notices</Text>
+          </TouchableOpacity>
+
+          {/* Action 5: Submit Market Sanitation Feedback */}
+          <TouchableOpacity
+            style={styles.actionGridCard}
+            activeOpacity={0.85}
+            onPress={() => router.push("/feedback")}
+            accessibilityRole="button"
+            accessibilityLabel="Submit Market Sanitation Feedback"
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: "#F3E5F5" }]}>
+              <MaterialCommunityIcons
+                name="message-text-outline"
+                size={24}
+                color="#7B1FA2"
+              />
+            </View>
+            <Text style={styles.actionLabel}>Feedback</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 4. MARKET DISPATCH & COLLECTION TIMING */}
         <View style={styles.card}>
           <Text style={styles.cardHeaderTitle}>Daily Commercial Waste Pickup</Text>
@@ -344,7 +383,7 @@ export default function VendorDashboard() {
         <View style={styles.card}>
           <Text style={styles.cardHeaderTitle}>Market Operational Hours</Text>
           <Text style={styles.infoParagraph}>
-            Divisoria Public Market operates daily from 04:00 AM to 08:00 PM. Municipal sanitation sweeps
+            Cogon & Carmen Public Markets operate daily from 04:00 AM to 08:00 PM. Municipal sanitation sweeps
             occur twice daily at 11:30 AM and 07:30 PM.
           </Text>
         </View>

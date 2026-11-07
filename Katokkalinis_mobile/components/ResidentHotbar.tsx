@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 
-export type ResidentTabKey = "home" | "vendors" | "reports" | "schedule" | "profile";
+export type ResidentTabKey = "home" | "compliance" | "reports" | "schedule" | "profile";
 
 interface ResidentHotbarProps {
   activeTab?: ResidentTabKey;
@@ -16,8 +16,8 @@ export default function ResidentHotbar({ activeTab }: ResidentHotbarProps) {
   let currentTab: ResidentTabKey = "home";
   if (activeTab) {
     currentTab = activeTab;
-  } else if (pathname.includes("/vendors")) {
-    currentTab = "vendors";
+  } else if (pathname.includes("/compliance")) {
+    currentTab = "compliance";
   } else if (pathname.includes("/report")) {
     currentTab = "reports";
   } else if (pathname.includes("/schedule")) {
@@ -65,27 +65,27 @@ export default function ResidentHotbar({ activeTab }: ResidentHotbarProps) {
         </Text>
       </TouchableOpacity>
 
-      {/* 2. VENDORS */}
+      {/* 2. SCHEDULE */}
       <TouchableOpacity
         style={styles.navItem}
         activeOpacity={0.8}
-        onPress={() => navigateTo("vendors", "/vendors")}
+        onPress={() => navigateTo("schedule", "/schedule")}
         accessibilityRole="button"
-        accessibilityLabel="Navigate to Public Market Vendors"
+        accessibilityLabel="Navigate to Collection Schedule"
       >
         <MaterialCommunityIcons
-          name={currentTab === "vendors" ? "storefront" : "storefront-outline"}
+          name={currentTab === "schedule" ? "calendar-month" : "calendar-month-outline"}
           size={23}
-          color={currentTab === "vendors" ? "#2E7D32" : "#7A8D78"}
+          color={currentTab === "schedule" ? "#2E7D32" : "#7A8D78"}
         />
         <Text
           style={[
             styles.navItemText,
-            currentTab === "vendors" && styles.navItemTextActive,
+            currentTab === "schedule" && styles.navItemTextActive,
           ]}
           numberOfLines={1}
         >
-          Vendors
+          Schedule
         </Text>
       </TouchableOpacity>
 
@@ -113,27 +113,27 @@ export default function ResidentHotbar({ activeTab }: ResidentHotbarProps) {
         </Text>
       </TouchableOpacity>
 
-      {/* 4. SCHEDULE */}
+      {/* 4. COMPLIANCE */}
       <TouchableOpacity
         style={styles.navItem}
         activeOpacity={0.8}
-        onPress={() => navigateTo("schedule", "/schedule")}
+        onPress={() => navigateTo("compliance", "/compliance")}
         accessibilityRole="button"
-        accessibilityLabel="Navigate to Collection Schedule"
+        accessibilityLabel="Navigate to Compliance and Segregation Guide"
       >
         <MaterialCommunityIcons
-          name={currentTab === "schedule" ? "calendar-month" : "calendar-month-outline"}
+          name={currentTab === "compliance" ? "leaf-circle" : "leaf-circle-outline"}
           size={23}
-          color={currentTab === "schedule" ? "#2E7D32" : "#7A8D78"}
+          color={currentTab === "compliance" ? "#2E7D32" : "#7A8D78"}
         />
         <Text
           style={[
             styles.navItemText,
-            currentTab === "schedule" && styles.navItemTextActive,
+            currentTab === "compliance" && styles.navItemTextActive,
           ]}
           numberOfLines={1}
         >
-          Schedule
+          Compliance
         </Text>
       </TouchableOpacity>
 

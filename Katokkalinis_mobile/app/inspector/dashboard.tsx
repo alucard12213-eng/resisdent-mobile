@@ -16,7 +16,7 @@ import { fetchInspectorStats } from "../../services/inspector";
 export default function InspectorDashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState("John Inspector");
-  const assignedArea = "Divi & Cogon Public Markets";
+  const assignedArea = "Cogon & Carmen Public Markets";
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
 
@@ -182,7 +182,7 @@ export default function InspectorDashboard() {
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.vendorNameText}>KatokKalimpyo Fresh Fruits</Text>
-              <Text style={styles.vendorStallText}>Stall #12 • Divisoria Public Market</Text>
+              <Text style={styles.vendorStallText}>Stall #12 • Carmen Public Market</Text>
             </View>
             <View style={styles.actionBadge}>
               <Text style={styles.actionBadgeText}>Grade Now</Text>
@@ -208,7 +208,7 @@ export default function InspectorDashboard() {
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.vendorNameText}>KalimpyoKatok Vegetable Stand</Text>
-              <Text style={styles.vendorStallText}>Stall #45 • Cogon Market Center</Text>
+              <Text style={styles.vendorStallText}>Stall #45 • Cogon Public Market</Text>
             </View>
             <View style={styles.actionBadge}>
               <Text style={styles.actionBadgeText}>Grade Now</Text>
@@ -222,7 +222,7 @@ export default function InspectorDashboard() {
         <TouchableOpacity
           style={styles.navItem}
           activeOpacity={0.8}
-          onPress={() => {}}
+          onPress={() => { }}
         >
           <MaterialCommunityIcons name="home" size={24} color="#2E7D32" />
           <Text style={[styles.navItemText, styles.navItemTextActive]}>Home</Text>

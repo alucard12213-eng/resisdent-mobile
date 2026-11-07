@@ -23,9 +23,9 @@ import { submitReport } from "../services/resident";
 
 const issueCategories = [
   { id: "uncollected", label: "Uncollected Waste", icon: "trash-can-outline" },
+  { id: "missed_schedules", label: "Missed Schedules", icon: "calendar-alert" },
   { id: "illegal_dumping", label: "Illegal Dumping", icon: "alert-octagon-outline" },
-  { id: "damaged_bin", label: "Damaged Bin", icon: "delete-restore" },
-  { id: "spill", label: "Waste Spill / Odor", icon: "scent-off" },
+  { id: "other_concerns", label: "Other Sanitation Concerns", icon: "clipboard-alert-outline" },
 ];
 
 export default function Post() {
@@ -72,8 +72,11 @@ export default function Post() {
 
     try {
       setLoading(true);
+      const activeCat = issueCategories.find((c) => c.id === selectedCategory);
+      const categoryLabel = activeCat ? activeCat.label : "Uncollected Waste";
       const data = {
-        title: title.trim(),
+        title: `[${categoryLabel}] ${title.trim()}`,
+        category: categoryLabel,
         description: description.trim(),
         location: `${selectedBarangay.name}, Cagayan de Oro City`,
         barangay_id: selectedBarangay.id,

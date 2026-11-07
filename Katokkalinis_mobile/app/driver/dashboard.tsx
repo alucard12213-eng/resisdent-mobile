@@ -17,10 +17,9 @@ import {
   View,
 } from "react-native";
 import KatokLogo from "../../components/KatokLogo";
-import LiveRouteMapView from "../../components/LiveRouteMapView";
 import TopNotificationBanner from "../../components/TopNotificationBanner";
 import { resolveMediaUrl } from "../../services/api";
-import { fetchNotifications } from "../../services/resident";
+import { fetchNotifications, submitReport } from "../../services/resident";
 import {
   BarangayItem,
   CollectionLogItem,
@@ -32,13 +31,6 @@ import {
   submitCollectionLog,
   updateDriverTruckStatus,
 } from "../../services/driver";
-import {
-  addLocationListener,
-  isAutomaticRecordingActive,
-  LiveLocationState,
-  startAutomaticLocationRecording,
-  stopAutomaticLocationRecording,
-} from "../../services/locationService";
 
 export default function DriverDashboard() {
   const router = useRouter();
@@ -49,8 +41,8 @@ export default function DriverDashboard() {
 
   // Barangay data
   const [barangaysList, setBarangaysList] = useState<BarangayItem[]>([]);
-  const [selectedBrgy, setSelectedBrgy] = useState("Barangay 2");
-  const [selectedBrgyId, setSelectedBrgyId] = useState<number | undefined>(2);
+  const [selectedBrgy, setSelectedBrgy] = useState("Barangay 31");
+  const [selectedBrgyId, setSelectedBrgyId] = useState<number | undefined>(31);
 
   // Collection Logs
   const [collectionLogs, setCollectionLogs] = useState<CollectionLogItem[]>([]);
@@ -91,8 +83,22 @@ export default function DriverDashboard() {
     type: "truck" as "truck" | "info" | "success" | "warning",
   });
 
-  // Live GPS Telemetry Broadcast State
-  const [liveGpsState, setLiveGpsState] = useState<LiveLocationState | null>(null);
+  // Pre-Trip & Truck Condition Inspection State (Capstone Fig 3.2 & Use Case 6.3)
+  const [inspectModalVisible, setInspectModalVisible] = useState(false);
+  const [truckCondition, setTruckCondition] = useState<"operational" | "maintenance">("operational");
+  const [brakesTiresOk, setBrakesTiresOk] = useState(true);
+  const [hydraulicsOk, setHydraulicsOk] = useState(true);
+  const [lightsSafetyOk, setLightsSafetyOk] = useState(true);
+  const [inspectNotes, setInspectNotes] = useState("");
+  const [savingInspect, setSavingInspect] = useState(false);
+
+  // Field Issue / Hazard Report Modal State (Capstone Scope p.12 & Use Case 6.3)
+  const [issueModalVisible, setIssueModalVisible] = useState(false);
+  const [issueCategory, setIssueCategory] = useState("Vehicle Breakdown");
+  const [issueBrgy, setIssueBrgy] = useState("Barangay 31");
+  const [issueBrgyId, setIssueBrgyId] = useState<number>(31);
+  const [issueDescription, setIssueDescription] = useState("");
+  const [submittingIssue, setSubmittingIssue] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -102,14 +108,8 @@ export default function DriverDashboard() {
     loadNotifCount();
     const notifTimer = setInterval(loadNotifCount, 8000);
 
-    // Subscribe to real-time location recorder pings
-    const unsubscribeLocation = addLocationListener((state) => {
-      setLiveGpsState(state);
-    });
-
     return () => {
       clearInterval(notifTimer);
-      unsubscribeLocation();
     };
   }, []);
 
@@ -137,12 +137,9 @@ export default function DriverDashboard() {
       const collecting = await AsyncStorage.getItem("driver_is_collecting");
       if (collecting === "true") {
         setIsCollecting(true);
-        if (!isAutomaticRecordingActive()) {
-          startAutomaticLocationRecording({ plateNumber: truckPlate }).catch(() => {});
-        }
       }
 
-      // Query backend for real-time driver & assigned truck state
+      // Query backend for assigned truck operating status
       const fleetRes = await getDriverFleetStatus();
       if (fleetRes?.success && Array.isArray(fleetRes.drivers)) {
         const myTruck = fleetRes.drivers.find(
@@ -150,14 +147,10 @@ export default function DriverDashboard() {
         );
         if (myTruck) {
           const isServerOnRoute = myTruck.driver_status === "on_route" || myTruck.operating_status === "on_route";
+          const isUnderMaintenance = myTruck.driver_status === "maintenance" || myTruck.operating_status === "maintenance";
           setIsCollecting(isServerOnRoute);
+          setTruckCondition(isUnderMaintenance ? "maintenance" : "operational");
           await AsyncStorage.setItem("driver_is_collecting", isServerOnRoute ? "true" : "false");
-
-          if (isServerOnRoute && !isAutomaticRecordingActive()) {
-            startAutomaticLocationRecording({ plateNumber: truckPlate }).catch(() => {});
-          } else if (!isServerOnRoute && isAutomaticRecordingActive()) {
-            stopAutomaticLocationRecording(truckPlate).catch(() => {});
-          }
         }
       }
     } catch (e) {
@@ -250,22 +243,19 @@ export default function DriverDashboard() {
   };
 
   const handleStartCollection = async () => {
+    if (truckCondition === "maintenance") {
+      Alert.alert(
+        "Truck Under Maintenance",
+        `Truck ${truckPlate} is flagged for maintenance. Open "Inspect Truck" to clear pre-trip checks before starting a run.`
+      );
+      return;
+    }
+
     setIsCollecting(true);
     setRouteCompleted(false);
     await AsyncStorage.setItem("driver_is_collecting", "true");
 
-    // Automatically begin periodic live GPS telemetry recording to Superadmin Dashboard
-    startAutomaticLocationRecording({
-      plateNumber: truckPlate,
-      intervalMs: 5000,
-      onPing: (loc) => {
-        setLiveGpsState(loc);
-      },
-    }).catch((err) => {
-      console.warn("Failed to initiate automatic GPS recording:", err);
-    });
-
-    // Broadcast status update to backend & web live
+    // Update status on CLENRO web dashboard (status-based logging, no live GPS tracking)
     updateDriverTruckStatus("on_route", undefined, truckPlate).catch((err) => {
       console.warn("Could not sync truck on_route status to server:", err);
     });
@@ -274,8 +264,8 @@ export default function DriverDashboard() {
 
     setBanner({
       visible: true,
-      title: "Route & Live GPS Started",
-      message: `Truck ${truckPlate} is now ON ROUTE. Telemetry is automatically streaming every 5s to the Superadmin Dashboard map.`,
+      title: "Scheduled Collection Run Active",
+      message: `Truck ${truckPlate} is now ON ROUTE for Compactor Route #04 (Barangays 31–40). Status logged to CLENRO dashboard.`,
       type: "truck",
     });
   };
@@ -291,14 +281,9 @@ export default function DriverDashboard() {
           style: "destructive",
           onPress: async () => {
             setIsCollecting(false);
+            setRouteCompleted(true);
             await AsyncStorage.setItem("driver_is_collecting", "false");
 
-            // Stop automatic location recorder and send final depot status
-            await stopAutomaticLocationRecording(truckPlate).catch((err) => {
-              console.warn("Error stopping location recorder:", err);
-            });
-
-            // Broadcast status update to backend & web live
             updateDriverTruckStatus("available", undefined, truckPlate).catch((err) => {
               console.warn("Could not sync truck available status to server:", err);
             });
@@ -307,14 +292,94 @@ export default function DriverDashboard() {
 
             setBanner({
               visible: true,
-              title: "Collection Run Ended",
-              message: "Truck status updated to AVAILABLE on web dashboard. GPS recording stopped. Remember to finalize collection logs.",
+              title: "Collection Run Completed",
+              message: `Truck ${truckPlate} status updated to AVAILABLE at depot. Remember to finalize your barangay collection logs.`,
               type: "info",
             });
           },
         },
       ]
     );
+  };
+
+  // Pre-Trip Truck Condition Inspection Handler (Flowchart Fig 3.2)
+  const handleSaveTruckInspection = async () => {
+    const allChecksPass = brakesTiresOk && hydraulicsOk && lightsSafetyOk;
+    const nextCondition: "operational" | "maintenance" =
+      truckCondition === "maintenance" || !allChecksPass ? "maintenance" : "operational";
+    const apiStatus =
+      nextCondition === "maintenance" ? "maintenance" : isCollecting ? "on_route" : "available";
+
+    try {
+      setSavingInspect(true);
+      await updateDriverTruckStatus(apiStatus, undefined, truckPlate);
+      setTruckCondition(nextCondition);
+      if (nextCondition === "maintenance" && isCollecting) {
+        setIsCollecting(false);
+        await AsyncStorage.setItem("driver_is_collecting", "false");
+      }
+      setInspectModalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setBanner({
+        visible: true,
+        title:
+          nextCondition === "operational"
+            ? `Truck ${truckPlate} Cleared for Duty`
+            : `Truck ${truckPlate} Flagged for Maintenance`,
+        message:
+          nextCondition === "operational"
+            ? "Pre-trip safety & compactor inspection logged to CLENRO fleet status."
+            : `Maintenance notice sent to CLENRO dispatch${inspectNotes.trim() ? `: ${inspectNotes.trim()}` : "."}`,
+        type: nextCondition === "operational" ? "success" : "warning",
+      });
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not update truck status.");
+    } finally {
+      setSavingInspect(false);
+    }
+  };
+
+  // Field Issue / Hazard Submission Handler (Scope p.12 & Use Case Fig 6.3)
+  const handleSubmitFieldIssue = async () => {
+    if (!issueDescription.trim()) {
+      Alert.alert("Details Required", "Please briefly describe the field issue or route obstruction.");
+      return;
+    }
+
+    try {
+      setSubmittingIssue(true);
+      const res = await submitReport({
+        title: `[Driver Field Issue • ${truckPlate}] ${issueCategory}`,
+        description: `[Category: ${issueCategory}] [Truck: ${truckPlate}] ${issueDescription.trim()}`,
+        location: `${issueBrgy}, Route #04 South Poblacion, Cagayan de Oro City`,
+        barangay_id: issueBrgyId || 31,
+      });
+
+      if (issueCategory === "Vehicle Breakdown") {
+        setTruckCondition("maintenance");
+        setIsCollecting(false);
+        await AsyncStorage.setItem("driver_is_collecting", "false");
+        updateDriverTruckStatus("maintenance", undefined, truckPlate).catch(() => {});
+      }
+
+      if (res?.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        setIssueModalVisible(false);
+        setIssueDescription("");
+        setBanner({
+          visible: true,
+          title: "Field Issue Reported to CLENRO",
+          message: `${issueCategory} at ${issueBrgy} has been logged for dispatcher action.`,
+          type: "warning",
+        });
+      } else {
+        Alert.alert("Submission Failed", res?.message || "Could not submit field issue.");
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Failed to submit field issue.");
+    } finally {
+      setSubmittingIssue(false);
+    }
   };
 
 
@@ -558,62 +623,47 @@ export default function DriverDashboard() {
           </View>
         </View>
 
-        {/* LIVE GPS BROADCASTING CARD (Syncs directly to Superadmin Dashboard) */}
-        {isCollecting && (
-          <View style={styles.liveGpsBroadcastingCard}>
-            <View style={styles.liveGpsHeader}>
-              <View style={styles.gpsPulseContainer}>
-                <View style={styles.gpsPulseDot} />
-                <Text style={styles.gpsBroadcastingText}>LIVE GPS RECORDING ACTIVE</Text>
-              </View>
-              <View style={styles.gpsPingsBadge}>
-                <Text style={styles.gpsPingsText}>
-                  {liveGpsState?.pingsCount ? `${liveGpsState.pingsCount} pings sent` : "Broadcasting"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.gpsTelemetryRow}>
-              <View style={styles.gpsTelemetryItem}>
-                <Text style={styles.gpsTelemetryLabel}>CURRENT GPS</Text>
-                <Text style={styles.gpsTelemetryValue}>
-                  {liveGpsState?.latitude ? `${liveGpsState.latitude.toFixed(4)}, ${liveGpsState.longitude.toFixed(4)}` : "8.4735, 124.6545"}
-                </Text>
-              </View>
-              <View style={styles.gpsTelemetryItem}>
-                <Text style={styles.gpsTelemetryLabel}>SPEED</Text>
-                <Text style={styles.gpsTelemetryValue}>
-                  {liveGpsState?.speed ? `${liveGpsState.speed} km/h` : "18.5 km/h"}
-                </Text>
-              </View>
-              <View style={styles.gpsTelemetryItem}>
-                <Text style={styles.gpsTelemetryLabel}>SUPERADMIN</Text>
-                <Text style={[styles.gpsTelemetryValue, { color: "#2E7D32" }]}>
-                  Connected
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.gpsSectorRow}>
-              <MaterialCommunityIcons name="map-marker-radius" size={14} color="#1E5E22" />
-              <Text style={styles.gpsSectorSub}>
-                {liveGpsState?.currentSectorName ? `Active Sector: ${liveGpsState.currentSectorName}` : "Active Sector: Route #04 South Poblacion"}
+        {/* SCHEDULED CORRIDOR & TRUCK CONDITION SUMMARY CARD (Status-Based, No Live GPS) */}
+        <View style={styles.routeSummaryCard}>
+          <View style={styles.routeSummaryHeader}>
+            <View style={styles.routeSummaryTitleRow}>
+              <MaterialCommunityIcons
+                name={truckCondition === "maintenance" ? "wrench-clock" : "calendar-clock"}
+                size={16}
+                color={truckCondition === "maintenance" ? "#C62828" : "#15803D"}
+              />
+              <Text style={styles.routeSummaryTitle}>
+                Schedule: Mon • Wed • Fri (08:00–11:00 AM)
               </Text>
             </View>
+          </View>
 
-            {/* Embedded Live Route Map inside the Live GPS Recording Module */}
-            <View style={{ marginTop: 10 }}>
-              <LiveRouteMapView
-                height={210}
-                selectedRouteId={4}
-                compact={true}
-                onExpandPress={() => router.push("/driver/map" as any)}
-              />
+          <View style={styles.routeSummaryStatsRow}>
+            <View style={styles.routeSummaryCol}>
+              <Text style={styles.routeSummaryLabel}>ASSIGNED SECTOR</Text>
+              <Text style={styles.routeSummaryVal}>Brgy 31–40 South</Text>
+            </View>
+            <View style={styles.routeSummaryCol}>
+              <Text style={styles.routeSummaryLabel}>TRUCK CONDITION</Text>
+              <Text
+                style={[
+                  styles.routeSummaryVal,
+                  { color: truckCondition === "maintenance" ? "#C62828" : "#2E7D32" },
+                ]}
+              >
+                {truckCondition === "maintenance" ? "Maintenance" : "Operational"}
+              </Text>
+            </View>
+            <View style={styles.routeSummaryCol}>
+              <Text style={styles.routeSummaryLabel}>DISPATCH SYNC</Text>
+              <Text style={[styles.routeSummaryVal, { color: "#1976D2" }]}>
+                {isCollecting ? "On Route" : routeCompleted ? "Completed" : "Standby"}
+              </Text>
             </View>
           </View>
-        )}
+        </View>
 
-        {/* QUICK ACTIONS */}
+        {/* QUICK ACTIONS (6 Capstone Driver Workflows in 2x3 Grid) */}
         <Text style={styles.sectionTitle}>Driver Quick Actions</Text>
 
         <View style={styles.quickActionsGrid}>
@@ -624,45 +674,69 @@ export default function DriverDashboard() {
             onPress={() => setRecordModalVisible(true)}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#E8F5E9" }]}>
-              <MaterialCommunityIcons name="plus-box" size={26} color="#2E7D32" />
+              <MaterialCommunityIcons name="plus-box" size={24} color="#2E7D32" />
             </View>
             <Text style={[styles.actionLabel, { fontWeight: "800", color: "#1E331B" }]}>Record Log</Text>
           </TouchableOpacity>
 
-          {/* Action 2: Start Collection */}
+          {/* Action 2: Inspect Truck Status */}
+          <TouchableOpacity
+            style={styles.actionGridCard}
+            activeOpacity={0.85}
+            onPress={() => setInspectModalVisible(true)}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: "#E1F5FE" }]}>
+              <MaterialCommunityIcons name="truck-check-outline" size={24} color="#0277BD" />
+            </View>
+            <Text style={styles.actionLabel}>Inspect Truck</Text>
+          </TouchableOpacity>
+
+          {/* Action 3: Report Field Issue */}
+          <TouchableOpacity
+            style={styles.actionGridCard}
+            activeOpacity={0.85}
+            onPress={() => setIssueModalVisible(true)}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: "#FBE9E7" }]}>
+              <MaterialCommunityIcons name="alert-rhombus-outline" size={24} color="#D84315" />
+            </View>
+            <Text style={styles.actionLabel}>Report Issue</Text>
+          </TouchableOpacity>
+
+          {/* Action 4: Start Collection */}
           <TouchableOpacity
             style={[styles.actionGridCard, isCollecting && styles.actionGridCardDisabled]}
             activeOpacity={0.85}
             onPress={handleStartCollection}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#E3F2FD" }]}>
-              <MaterialCommunityIcons name="play-circle-outline" size={26} color="#1976D2" />
+              <MaterialCommunityIcons name="play-circle-outline" size={24} color="#1976D2" />
             </View>
             <Text style={styles.actionLabel}>Start Run</Text>
           </TouchableOpacity>
 
-          {/* Action 3: Route Map */}
-          <TouchableOpacity
-            style={styles.actionGridCard}
-            activeOpacity={0.85}
-            onPress={() => router.push("/driver/map" as any)}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: "#FFF3E0" }]}>
-              <MaterialCommunityIcons name="map-marker-radius" size={24} color="#E65100" />
-            </View>
-            <Text style={styles.actionLabel}>Route Map</Text>
-          </TouchableOpacity>
-
-          {/* Action 4: End Collection */}
+          {/* Action 5: End Collection */}
           <TouchableOpacity
             style={[styles.actionGridCard, !isCollecting && styles.actionGridCardDisabled]}
             activeOpacity={0.85}
             onPress={handleEndCollection}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FFEBEE" }]}>
-              <MaterialCommunityIcons name="stop-circle-outline" size={26} color="#C62828" />
+              <MaterialCommunityIcons name="stop-circle-outline" size={24} color="#C62828" />
             </View>
             <Text style={styles.actionLabel}>End Run</Text>
+          </TouchableOpacity>
+
+          {/* Action 6: Assigned Routes */}
+          <TouchableOpacity
+            style={styles.actionGridCard}
+            activeOpacity={0.85}
+            onPress={() => router.push("/driver/map" as any)}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: "#F3E5F5" }]}>
+              <MaterialCommunityIcons name="map-marker-path" size={24} color="#6A1B9A" />
+            </View>
+            <Text style={styles.actionLabel}>Assigned Routes</Text>
           </TouchableOpacity>
         </View>
 
@@ -765,7 +839,7 @@ export default function DriverDashboard() {
                     onPress={() => setFullPhotoModalUri(resolveMediaUrl(log.photo_url))}
                   >
                     <Image
-                      source={{ uri: resolveMediaUrl(log.photo_url) }}
+                      source={{ uri: resolveMediaUrl(log.photo_url) || undefined }}
                       style={styles.logPhotoThumbnail}
                     />
                     <View style={styles.logPhotoMeta}>
@@ -1089,6 +1163,217 @@ export default function DriverDashboard() {
         </View>
       </Modal>
 
+      {/* MODAL 5: INSPECT TRUCK STATUS (Capstone Flowchart Fig 3.2) */}
+      <Modal visible={inspectModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Inspect Truck Status ({truckPlate})</Text>
+                <Text style={styles.modalSubTitle}>Pre-Trip Compactor & Safety Verification</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setInspectModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="close" size={22} color="#556655" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.modalLabel}>Pre-Trip Safety Checklist</Text>
+
+              {[
+                {
+                  label: "Brakes, Tires & Steering Clearance",
+                  value: brakesTiresOk,
+                  toggle: () => setBrakesTiresOk(!brakesTiresOk),
+                },
+                {
+                  label: "Hydraulic Compactor & Tailgate Seal",
+                  value: hydraulicsOk,
+                  toggle: () => setHydraulicsOk(!hydraulicsOk),
+                },
+                {
+                  label: "Warning Lights, Horn & Crew PPE Gear",
+                  value: lightsSafetyOk,
+                  toggle: () => setLightsSafetyOk(!lightsSafetyOk),
+                },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[styles.checkItemRow, item.value && styles.checkItemRowActive]}
+                  onPress={item.toggle}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons
+                    name={item.value ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
+                    size={20}
+                    color={item.value ? "#2E7D32" : "#9AA998"}
+                  />
+                  <Text style={styles.checkItemText}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+
+              <Text style={styles.modalLabel}>Overall Vehicle Readiness</Text>
+              <View style={styles.modalSelectRow}>
+                {[
+                  { key: "operational" as const, label: "Operational / Ready" },
+                  { key: "maintenance" as const, label: "Needs Maintenance" },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[
+                      styles.modalChip,
+                      truckCondition === opt.key &&
+                        (opt.key === "maintenance"
+                          ? { backgroundColor: "#C62828", borderColor: "#C62828" }
+                          : styles.modalChipActive),
+                    ]}
+                    onPress={() => setTruckCondition(opt.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalChipText,
+                        truckCondition === opt.key && styles.modalChipTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.modalLabel}>Inspection Remarks (Optional)</Text>
+              <View style={[styles.modalInputBox, { height: 65, alignItems: "flex-start", paddingTop: 8 }]}>
+                <TextInput
+                  style={[styles.modalInput, { height: "100%" }]}
+                  placeholder="e.g. Tire pressure verified; hydraulic bin lifter cleared."
+                  placeholderTextColor="#9AA998"
+                  value={inspectNotes}
+                  onChangeText={setInspectNotes}
+                  multiline
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitBtn,
+                  { backgroundColor: "#0277BD" },
+                  savingInspect && { opacity: 0.7 },
+                ]}
+                onPress={handleSaveTruckInspection}
+                activeOpacity={0.88}
+                disabled={savingInspect}
+              >
+                {savingInspect ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Log Truck Inspection Status</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 6: REPORT FIELD ISSUE / HAZARD (Capstone Scope p.12 & Use Case 6.3) */}
+      <Modal visible={issueModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Report Field Issue</Text>
+                <Text style={styles.modalSubTitle}>Notify CLENRO Dispatch of Route Obstructions or Breakdowns</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIssueModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="close" size={22} color="#556655" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.modalLabel}>Issue Category</Text>
+              <View style={styles.modalSelectRow}>
+                {[
+                  "Vehicle Breakdown",
+                  "Blocked / Narrow Road",
+                  "Missed Pickup",
+                  "Sanitation Hazard",
+                ].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.modalChip,
+                      issueCategory === cat && { backgroundColor: "#D84315", borderColor: "#D84315" },
+                    ]}
+                    onPress={() => setIssueCategory(cat)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalChipText,
+                        issueCategory === cat && styles.modalChipTextActive,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.modalLabel}>Affected Barangay (CDO 1 to 40)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {barangaysList.slice(0, 40).map((b) => (
+                  <TouchableOpacity
+                    key={`iss-${b.id}`}
+                    style={[styles.modalChip, issueBrgy === b.name && styles.modalChipActive]}
+                    onPress={() => {
+                      setIssueBrgy(b.name);
+                      setIssueBrgyId(b.id);
+                    }}
+                  >
+                    <Text style={[styles.modalChipText, issueBrgy === b.name && styles.modalChipTextActive]}>
+                      {b.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={styles.modalLabel}>Field Situation Details</Text>
+              <View style={[styles.modalInputBox, { height: 78, alignItems: "flex-start", paddingTop: 8 }]}>
+                <TextInput
+                  style={[styles.modalInput, { height: "100%" }]}
+                  placeholder="Describe road obstruction, mechanical issue, or unsegregated waste hazard..."
+                  placeholderTextColor="#9AA998"
+                  value={issueDescription}
+                  onChangeText={setIssueDescription}
+                  multiline
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitBtn,
+                  { backgroundColor: "#D84315" },
+                  submittingIssue && { opacity: 0.7 },
+                ]}
+                onPress={handleSubmitFieldIssue}
+                activeOpacity={0.88}
+                disabled={submittingIssue}
+              >
+                {submittingIssue ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Submit Field Issue to CLENRO</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* BOTTOM NAVIGATION */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
@@ -1303,16 +1588,18 @@ const styles = StyleSheet.create({
   },
   quickActionsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     marginTop: 10,
     marginBottom: 16,
-    gap: 8,
+    rowGap: 10,
   },
   actionGridCard: {
-    flex: 1,
+    width: "31.5%",
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 6,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E5ECE4",
@@ -1839,90 +2126,78 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
   },
-  liveGpsBroadcastingCard: {
-    backgroundColor: "#F0FDF4",
+  routeSummaryCard: {
+    backgroundColor: "#F4FBF6",
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: "#86EFAC",
-    shadowColor: "#15803D",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#CBE8D2",
   },
-  liveGpsHeader: {
+  routeSummaryHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  gpsPulseContainer: {
+  routeSummaryTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flex: 1,
   },
-  gpsPulseDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: "#16A34A",
-  },
-  gpsBroadcastingText: {
-    fontSize: 11,
+  routeSummaryTitle: {
+    fontSize: 11.5,
     fontWeight: "800",
     color: "#166534",
-    letterSpacing: 0.5,
+    flexShrink: 1,
   },
-  gpsPingsBadge: {
-    backgroundColor: "#DCFCE7",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#BBF7D0",
-  },
-  gpsPingsText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: "#15803D",
-  },
-  gpsTelemetryRow: {
+  routeSummaryStatsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     backgroundColor: "#FFFFFF",
-    padding: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#DCFCE7",
   },
-  gpsTelemetryItem: {
-    alignItems: "center",
+  routeSummaryCol: {
     flex: 1,
+    alignItems: "center",
   },
-  gpsTelemetryLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#4B5563",
-    textTransform: "uppercase",
+  routeSummaryLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: "#688264",
+    letterSpacing: 0.4,
     marginBottom: 2,
   },
-  gpsTelemetryValue: {
-    fontSize: 12,
+  routeSummaryVal: {
+    fontSize: 11.5,
     fontWeight: "800",
-    color: "#111827",
+    color: "#1E331B",
   },
-  gpsSectorRow: {
+  checkItemRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 8,
-    paddingHorizontal: 4,
+    gap: 8,
+    backgroundColor: "#F7FAF6",
+    borderWidth: 1,
+    borderColor: "#E2ECE1",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 6,
   },
-  gpsSectorSub: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: "#1E5E22",
+  checkItemRowActive: {
+    backgroundColor: "#ECFDF3",
+    borderColor: "#A7F3D0",
+  },
+  checkItemText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E331B",
+    flex: 1,
   },
 });

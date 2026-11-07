@@ -1,17 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
-  Linking,
-  Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,7 +19,7 @@ import {
 import KatokLogo from "../components/KatokLogo";
 import ResidentHotbar from "../components/ResidentHotbar";
 import TopNotificationBanner from "../components/TopNotificationBanner";
-import { fetchNextSchedule, scanPublicVendorQr } from "../services/resident";
+import { fetchNextSchedule } from "../services/resident";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const isSmall = SCREEN_WIDTH < 360;
@@ -90,13 +85,13 @@ const QUICK_ACTIONS = [
     keywords: ["schedule", "pickup", "calendar", "time", "date", "trash", "route"],
   },
   {
-    id: "scan_vendor_qr",
-    label: "Scan Vendor QR",
-    icon: "qrcode-scan",
+    id: "compliance",
+    label: "Compliance",
+    icon: "leaf-circle-outline",
     color: "#2E7D32",
     bg: "#E8F8EE",
-    action: "scan_qr",
-    keywords: ["scan", "qr", "vendor", "market", "stall", "sanitation", "grade", "badge"],
+    route: "/compliance",
+    keywords: ["compliance", "segregation", "guidelines", "biodegradable", "recyclable", "residual", "ordinance", "ra 9003"],
   },
   {
     id: "post",
@@ -105,7 +100,7 @@ const QUICK_ACTIONS = [
     color: "#2E7D32",
     bg: "#E8F8EE",
     route: "/post",
-    keywords: ["report", "complaint", "issue", "dumping", "spill", "bin", "camera", "photo"],
+    keywords: ["report", "complaint", "issue", "dumping", "missed", "uncollected", "camera", "photo"],
   },
   {
     id: "notifications",
@@ -114,7 +109,7 @@ const QUICK_ACTIONS = [
     color: "#F57F17",
     bg: "#FFF8E1",
     route: "/notifications",
-    keywords: ["notification", "alert", "notice", "truck approaching"],
+    keywords: ["notification", "alert", "notice", "reminder", "advisory"],
   },
   {
     id: "feedback",
@@ -123,7 +118,7 @@ const QUICK_ACTIONS = [
     color: "#7B1FA2",
     bg: "#F3E5F5",
     route: "/feedback",
-    keywords: ["feedback", "suggestion", "support", "community", "message"],
+    keywords: ["feedback", "suggestion", "support", "community", "message", "timing", "quality"],
   },
 ];
 
@@ -144,14 +139,6 @@ export default function Dashboard() {
     message: "",
     type: "truck",
   });
-
-  // QR Scanner Modal State
-  const [qrModalVisible, setQrModalVisible] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanningLoading, setScanningLoading] = useState(false);
-  const [scanError, setScanError] = useState(null);
-  const [manualQrInput, setManualQrInput] = useState("");
-  const isProcessingScanRef = useRef(false);
 
   const loadUserData = async () => {
     try {
@@ -241,99 +228,10 @@ export default function Dashboard() {
     loadScheduleData();
   };
 
-  const handleOpenVendorQrScanner = async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-
-    isProcessingScanRef.current = false;
-    setScanningLoading(false);
-    setScanError(null);
-    setManualQrInput("");
-    setQrModalVisible(true);
-
-    if (!permission?.granted) {
-      try {
-        await requestPermission();
-      } catch (err) {
-        console.warn("Camera permission request error:", err);
-      }
-    }
-  };
-
-  const handleCloseVendorQrScanner = () => {
-    isProcessingScanRef.current = false;
-    setScanningLoading(false);
-    setScanError(null);
-    setQrModalVisible(false);
-  };
-
-  const handleVerifyQrData = async (rawQrData) => {
-    const code = safeString(rawQrData, "").trim();
-    if (!code) {
-      setScanError("Please scan a valid vendor stall QR code or enter the stall QR token.");
-      return;
-    }
-
-    if (isProcessingScanRef.current || scanningLoading) {
-      return;
-    }
-
-    isProcessingScanRef.current = true;
-    setScanningLoading(true);
-    setScanError(null);
-
-    try {
-      const res = await scanPublicVendorQr(code);
-      if (res && res.success && res.vendor) {
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-
-        const matchedCode = safeString(
-          res.vendor.vendor_code || res.vendor.id || code
-        );
-        setQrModalVisible(false);
-        isProcessingScanRef.current = false;
-        setScanningLoading(false);
-
-        // Navigate directly to the Vendor Information screen with the identified vendor open
-        router.push({
-          pathname: "/vendors",
-          params: { vendorCode: matchedCode },
-        });
-      } else {
-        const msg =
-          res?.message ||
-          "Unrecognized or invalid vendor QR code. Please scan an official KatokKalinis public market stall badge.";
-        setScanError(msg);
-        isProcessingScanRef.current = false;
-      }
-    } catch (err) {
-      const errMsg =
-        err?.message ||
-        "Unable to verify vendor QR code right now. Please check your connection and try again.";
-      setScanError(errMsg);
-      isProcessingScanRef.current = false;
-    } finally {
-      setScanningLoading(false);
-    }
-  };
-
-  const handleBarcodeScanned = ({ data }) => {
-    if (!data || isProcessingScanRef.current || scanningLoading) return;
-    handleVerifyQrData(data);
-  };
-
   const handlePressQuickAction = (actionItem) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-
-    if (actionItem.action === "scan_qr") {
-      handleOpenVendorQrScanner();
-      return;
-    }
 
     if (actionItem.route) {
       router.push(actionItem.route);
@@ -389,10 +287,17 @@ export default function Dashboard() {
       )})`
     : "";
 
-  const hasLiveGps = Boolean(
-    nextSchedule?.current_truck_location?.gps_available ||
-      nextSchedule?.assigned_truck?.current_location?.gps_available
-  );
+  const scheduleStatusRaw = safeString(
+    nextSchedule?.collection_status || nextSchedule?.status,
+    "scheduled"
+  ).toLowerCase();
+
+  const scheduleStatusLabel =
+    scheduleStatusRaw === "in_progress"
+      ? "IN PROGRESS"
+      : scheduleStatusRaw === "completed"
+      ? "COMPLETED"
+      : "SCHEDULED";
 
   useEffect(() => {
     if (!scheduleDateRaw) {
@@ -411,7 +316,7 @@ export default function Dashboard() {
         setTopBanner({
           visible: true,
           title: "Garbage Collection Today",
-          message: `Scheduled pickup today at ${pickupTimeDisplay} for ${userLocation}. Please have your bins ready.`,
+          message: `Scheduled pickup today at ${pickupTimeDisplay} for ${userLocation}. Please have your segregated bins ready.`,
           type: "truck",
         });
 
@@ -419,7 +324,7 @@ export default function Dashboard() {
           .then(({ triggerLocalNotification }) => {
             triggerLocalNotification(
               "Garbage Collection Today",
-              `Scheduled pickup today at ${pickupTimeDisplay} for ${userLocation}. Please have your bins ready.`
+              `Scheduled pickup today at ${pickupTimeDisplay} for ${userLocation}. Please have your segregated bins ready.`
             );
           })
           .catch(() => {});
@@ -487,7 +392,7 @@ export default function Dashboard() {
           <MaterialCommunityIcons name="magnify" size={20} color="#7A8D78" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search schedules, QR scanner, reports, or alerts..."
+            placeholder="Search schedules, compliance guide, reports, or alerts..."
             placeholderTextColor="#9AA998"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -504,7 +409,7 @@ export default function Dashboard() {
           )}
         </View>
 
-        {/* 4. MAIN HERO CARD: NEXT COLLECTION WITH LIVE DB COUNTDOWN */}
+        {/* 4. MAIN HERO CARD: NEXT COLLECTION WITH SCHEDULED WINDOW */}
         <TouchableOpacity
           style={styles.heroCard}
           activeOpacity={0.9}
@@ -514,10 +419,10 @@ export default function Dashboard() {
             <View style={styles.heroCardHeaderRow}>
               <Text style={styles.heroTitle}>Next Collection</Text>
               {loadingSchedule && <ActivityIndicator size="small" color="#2E7D32" />}
-              {hasLiveGps && (
-                <View style={styles.liveGpsPill}>
-                  <View style={styles.liveGpsDot} />
-                  <Text style={styles.liveGpsText}>LIVE GPS</Text>
+              {nextSchedule && (
+                <View style={styles.statusPill}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.statusPillText}>{scheduleStatusLabel}</Text>
                 </View>
               )}
             </View>
@@ -534,7 +439,7 @@ export default function Dashboard() {
                 ? `Scheduled Window: ${pickupTimeDisplay}${
                     endTimeDisplay ? ` – ${endTimeDisplay}` : ""
                   }`
-                : "Tap to view city collection calendar"}
+                : "Tap to view barangay collection calendar"}
             </Text>
 
             {(routeNameDisplay || assignedTruckDisplay) ? (
@@ -549,9 +454,9 @@ export default function Dashboard() {
                 ) : null}
                 {assignedTruckDisplay ? (
                   <View style={styles.heroRouteRow}>
-                    <MaterialCommunityIcons name="truck-fast-outline" size={13} color="#1976D2" />
+                    <MaterialCommunityIcons name="truck-check-outline" size={13} color="#1976D2" />
                     <Text style={styles.heroTruckText} numberOfLines={1}>
-                      Truck {assignedTruckDisplay}
+                      Assigned Unit: {assignedTruckDisplay}
                     </Text>
                   </View>
                 ) : null}
@@ -568,7 +473,7 @@ export default function Dashboard() {
           </View>
         </TouchableOpacity>
 
-        {/* 5. QUICK ACTIONS GRID (Schedule, Scan Vendor QR, Submit Report, Notifications, Feedback) */}
+        {/* 5. QUICK ACTIONS GRID (Schedule, Compliance, Submit Report, Notifications, Feedback) */}
         <View style={styles.quickActionsHeaderRow}>
           <Text style={styles.sectionTitle}>
             {searchQuery.trim() ? `Search Results (${displayedActions.length})` : "Quick Actions"}
@@ -597,223 +502,32 @@ export default function Dashboard() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* 6. CLENRO SEGREGATION COMPLIANCE REMINDER CARD */}
+        <TouchableOpacity
+          style={styles.complianceBanner}
+          activeOpacity={0.88}
+          onPress={() => router.push("/compliance")}
+        >
+          <View style={styles.complianceIconCircle}>
+            <MaterialCommunityIcons name="recycle" size={24} color="#2E7D32" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.complianceTagRow}>
+              <Text style={styles.complianceTagText}>CLENRO • RA 9003</Text>
+            </View>
+            <Text style={styles.complianceBannerTitle}>
+              No Segregation, No Collection
+            </Text>
+            <Text style={styles.complianceBannerSub}>
+              Sort household waste into Biodegradable, Recyclable, Residual, and Special bins 30 mins before pickup.
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={22} color="#2E7D32" />
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* ====================================================================
-          OFFICIAL VENDOR QR SCANNER MODAL (OPENED BY "SCAN VENDOR QR")
-          ==================================================================== */}
-      <Modal
-        visible={qrModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseVendorQrScanner}
-      >
-        <View style={styles.scannerBackdrop}>
-          <View style={styles.scannerSheet}>
-            {/* Top Bar with Manual Back Button to Return to Dashboard */}
-            <View style={styles.scannerTopBar}>
-              <TouchableOpacity
-                style={styles.scannerBackBtn}
-                onPress={handleCloseVendorQrScanner}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name="arrow-left" size={20} color="#1E331B" />
-                <Text style={styles.scannerBackBtnText}>Back</Text>
-              </TouchableOpacity>
-
-              <View style={styles.scannerTitleWrap}>
-                <Text style={styles.scannerTitle}>Scan Vendor QR</Text>
-                <Text style={styles.scannerSubtitle}>
-                  Official Market Stall Badge Scanner
-                </Text>
-              </View>
-
-              <View style={{ width: 64 }} />
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scannerScrollContent}
-            >
-              {/* Camera Viewport or Permission Prompt */}
-              <View style={styles.cameraContainer}>
-                {scanningLoading ? (
-                  <View style={styles.cameraStatusBox}>
-                    <ActivityIndicator size="large" color="#2E7D32" />
-                    <Text style={styles.cameraStatusTitle}>
-                      Verifying Stall QR Badge...
-                    </Text>
-                    <Text style={styles.cameraStatusSub}>
-                      Retrieving public sanitation grade and inspection record from KatokKalinis database.
-                    </Text>
-                  </View>
-                ) : !permission ? (
-                  <View style={styles.cameraStatusBox}>
-                    <ActivityIndicator size="small" color="#2E7D32" />
-                    <Text style={styles.cameraStatusSub}>
-                      Checking device camera permissions...
-                    </Text>
-                  </View>
-                ) : permission.granted ? (
-                  <View style={styles.cameraLiveWrapper}>
-                    <CameraView
-                      style={StyleSheet.absoluteFill}
-                      facing="back"
-                      barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                      onBarcodeScanned={
-                        isProcessingScanRef.current || scanningLoading
-                          ? undefined
-                          : handleBarcodeScanned
-                      }
-                    />
-                    <View style={styles.qrTargetFrame} />
-                    <View style={styles.cameraOverlayHint}>
-                      <MaterialCommunityIcons name="qrcode-scan" size={14} color="#FFFFFF" />
-                      <Text style={styles.cameraOverlayHintText}>
-                        Align the vendor&apos;s official stall QR badge inside the frame
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.permissionDeniedBox}>
-                    <View style={styles.permissionIconCircle}>
-                      <MaterialCommunityIcons
-                        name="camera-off-outline"
-                        size={34}
-                        color="#D97706"
-                      />
-                    </View>
-                    <Text style={styles.permissionDeniedTitle}>
-                      Camera Permission Required
-                    </Text>
-                    <Text style={styles.permissionDeniedSub}>
-                      KatokKalinis needs camera access to scan official QR badges attached to public market vendor stalls and display their sanitation grade.
-                    </Text>
-
-                    <View style={styles.permissionBtnRow}>
-                      <TouchableOpacity
-                        style={styles.requestPermBtn}
-                        onPress={requestPermission}
-                        activeOpacity={0.85}
-                      >
-                        <MaterialCommunityIcons
-                          name="camera-outline"
-                          size={16}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.requestPermBtnText}>
-                          Request Permission Again
-                        </Text>
-                      </TouchableOpacity>
-
-                      {Platform.OS !== "web" && (
-                        <TouchableOpacity
-                          style={styles.openSettingsBtn}
-                          onPress={() => Linking.openSettings()}
-                          activeOpacity={0.85}
-                        >
-                          <MaterialCommunityIcons
-                            name="cog-outline"
-                            size={16}
-                            color="#2E7D32"
-                          />
-                          <Text style={styles.openSettingsBtnText}>
-                            Open Device Settings
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              {/* Error Banner for Invalid / Unrecognized QR Codes */}
-              {scanError ? (
-                <View style={styles.scanErrorBox}>
-                  <MaterialCommunityIcons
-                    name="alert-circle-outline"
-                    size={20}
-                    color="#C62828"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.scanErrorTitle}>QR Verification Failed</Text>
-                    <Text style={styles.scanErrorText}>{scanError}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.scanRetryPill}
-                    onPress={() => {
-                      setScanError(null);
-                      isProcessingScanRef.current = false;
-                    }}
-                  >
-                    <Text style={styles.scanRetryPillText}>Scan Again</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {/* Manual QR Code / Token Input (For damaged badges or desktop browser testing) */}
-              <View style={styles.manualEntryCard}>
-                <Text style={styles.manualEntryLabel}>
-                  Or enter the official QR token / Vendor Code printed on the stall badge:
-                </Text>
-                <View style={styles.manualEntryRow}>
-                  <MaterialCommunityIcons name="qrcode" size={18} color="#2E7D32" />
-                  <TextInput
-                    style={styles.manualEntryInput}
-                    placeholder="Enter stall QR token or vendor code..."
-                    placeholderTextColor="#9AA998"
-                    value={manualQrInput}
-                    onChangeText={(txt) => {
-                      setManualQrInput(txt);
-                      if (scanError) setScanError(null);
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onSubmitEditing={() => handleVerifyQrData(manualQrInput)}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.verifyTokenBtn,
-                    (!manualQrInput.trim() || scanningLoading) &&
-                      styles.verifyTokenBtnDisabled,
-                  ]}
-                  disabled={!manualQrInput.trim() || scanningLoading}
-                  onPress={() => handleVerifyQrData(manualQrInput)}
-                  activeOpacity={0.85}
-                >
-                  <MaterialCommunityIcons
-                    name="shield-check-outline"
-                    size={18}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.verifyTokenBtnText}>
-                    {scanningLoading ? "Verifying..." : "Verify Vendor QR Code"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.returnDashboardBtn}
-                onPress={handleCloseVendorQrScanner}
-                activeOpacity={0.85}
-              >
-                <MaterialCommunityIcons
-                  name="arrow-left"
-                  size={18}
-                  color="#2E7D32"
-                />
-                <Text style={styles.returnDashboardBtnText}>
-                  Return to Dashboard
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 6. 5-TAB RESIDENT BOTTOM HOTBAR (Home, Vendors, Reports, Schedule, Profile) */}
+      {/* 7. 5-TAB RESIDENT BOTTOM HOTBAR (Home, Schedule, Reports, Compliance, Profile) */}
       <ResidentHotbar activeTab="home" />
     </View>
   );
@@ -861,7 +575,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 90,
+    paddingBottom: 95,
   },
   greetingBar: {
     marginBottom: 14,
@@ -962,27 +676,27 @@ const styles = StyleSheet.create({
     color: "#728F6E",
     fontWeight: "600",
   },
-  liveGpsPill: {
+  statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#DCFCE7",
-    borderColor: "#86EFAC",
+    backgroundColor: "#E8F8EE",
+    borderColor: "#B7DFB9",
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 999,
     gap: 4,
   },
-  liveGpsDot: {
+  statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#16A34A",
+    backgroundColor: "#2E7D32",
   },
-  liveGpsText: {
+  statusPillText: {
     fontSize: 9,
     fontWeight: "900",
-    color: "#15803D",
+    color: "#1E5E22",
     letterSpacing: 0.4,
   },
   heroRouteMeta: {
@@ -1015,7 +729,7 @@ const styles = StyleSheet.create({
     height: 58,
   },
 
-  // QUICK ACTIONS GRID (5 ITEMS BALANCED FOR 360px-430px)
+  // QUICK ACTIONS GRID (5 ITEMS)
   quickActionsHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1037,6 +751,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     rowGap: 14,
+    marginBottom: 20,
   },
   actionGridCard: {
     width: (SCREEN_WIDTH - 52) / 5,
@@ -1061,282 +776,44 @@ const styles = StyleSheet.create({
     lineHeight: 13.5,
   },
 
-  // QR SCANNER MODAL STYLES
-  scannerBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(12, 24, 12, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  scannerSheet: {
-    width: "100%",
-    maxWidth: 460,
-    maxHeight: "90%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 18,
-  },
-  scannerTopBar: {
+  // COMPLIANCE BANNER
+  complianceBanner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEF5ED",
-  },
-  scannerBackBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#F2F7F1",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 12,
-  },
-  scannerBackBtnText: {
-    fontSize: 12.5,
-    fontWeight: "800",
-    color: "#1E331B",
-  },
-  scannerTitleWrap: {
-    alignItems: "center",
-    flex: 1,
-  },
-  scannerTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#1E331B",
-  },
-  scannerSubtitle: {
-    fontSize: 11,
-    color: "#688264",
-    fontWeight: "600",
-  },
-  scannerScrollContent: {
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  cameraContainer: {
-    width: "100%",
-    minHeight: 250,
+    backgroundColor: "#EAF6E9",
     borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#101E10",
-    borderWidth: 1.5,
-    borderColor: "#C5E6CE",
-    marginBottom: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cameraLiveWrapper: {
-    width: "100%",
-    height: 260,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  qrTargetFrame: {
-    width: 185,
-    height: 185,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: "#4ADE80",
-    backgroundColor: "transparent",
-  },
-  cameraOverlayHint: {
-    position: "absolute",
-    bottom: 10,
-    left: 12,
-    right: 12,
-    backgroundColor: "rgba(15, 23, 42, 0.82)",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  cameraOverlayHintText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    textAlign: "center",
-  },
-  cameraStatusBox: {
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cameraStatusTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    marginTop: 12,
-  },
-  cameraStatusSub: {
-    fontSize: 12,
-    color: "#D1FAE5",
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 17,
-  },
-  permissionDeniedBox: {
-    backgroundColor: "#FFFDF7",
-    width: "100%",
-    padding: 20,
-    alignItems: "center",
-  },
-  permissionIconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "#FEF3C7",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  permissionDeniedTitle: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: "#1E331B",
-  },
-  permissionDeniedSub: {
-    fontSize: 12,
-    color: "#57534E",
-    textAlign: "center",
-    marginTop: 5,
-    lineHeight: 17,
-  },
-  permissionBtnRow: {
-    marginTop: 14,
-    width: "100%",
-    gap: 8,
-  },
-  requestPermBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#2E7D32",
-    paddingVertical: 11,
-    borderRadius: 12,
-  },
-  requestPermBtnText: {
-    color: "#FFFFFF",
-    fontSize: 12.5,
-    fontWeight: "800",
-  },
-  openSettingsBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#E8F8EE",
-    paddingVertical: 10,
-    borderRadius: 12,
+    padding: 15,
     borderWidth: 1,
-    borderColor: "#C5E6CE",
+    borderColor: "#CBE7C9",
+    gap: 12,
   },
-  openSettingsBtnText: {
-    color: "#2E7D32",
-    fontSize: 12.5,
-    fontWeight: "800",
-  },
-  scanErrorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FFEBEE",
-    borderColor: "#FFCDD2",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-  },
-  scanErrorTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#B71C1C",
-  },
-  scanErrorText: {
-    fontSize: 11.5,
-    color: "#C62828",
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  scanRetryPill: {
-    backgroundColor: "#C62828",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  scanRetryPillText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  manualEntryCard: {
-    backgroundColor: "#F6FAF5",
+  complianceIconCircle: {
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#DCE8D9",
-    marginBottom: 12,
-  },
-  manualEntryLabel: {
-    fontSize: 11.5,
-    fontWeight: "700",
-    color: "#3B5338",
-    marginBottom: 8,
-  },
-  manualEntryRow: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#CFE0CC",
-    paddingHorizontal: 10,
-    height: 42,
-    marginBottom: 10,
-  },
-  manualEntryInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    color: "#1E331B",
-  },
-  verifyTokenBtn: {
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#2E7D32",
-    paddingVertical: 11,
-    borderRadius: 12,
-  },
-  verifyTokenBtnDisabled: {
-    opacity: 0.55,
-  },
-  verifyTokenBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  returnDashboardBtn: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#F2F7F1",
   },
-  returnDashboardBtnText: {
-    fontSize: 13,
+  complianceTagRow: {
+    marginBottom: 2,
+  },
+  complianceTagText: {
+    fontSize: 10,
     fontWeight: "800",
     color: "#2E7D32",
+    letterSpacing: 0.5,
+  },
+  complianceBannerTitle: {
+    fontSize: 14.5,
+    fontWeight: "900",
+    color: "#1E331B",
+  },
+  complianceBannerSub: {
+    fontSize: 11.5,
+    color: "#456342",
+    lineHeight: 16,
+    marginTop: 2,
+    fontWeight: "500",
   },
 });

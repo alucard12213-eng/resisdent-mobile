@@ -21,7 +21,7 @@ export default function InspectorProfile() {
   const [name, setName] = useState("John Inspector");
   const [email, setEmail] = useState("inspector@katokkalinis.com");
   const [inspectorId, setInspectorId] = useState("INS-2026");
-  const assignedArea = "Divisoria & Cogon Market Zones";
+  const assignedArea = "Cogon & Carmen Public Markets";
 
   // Real stats from database (Requirement 3: Stalls Certified, Total Inspections, Pending Reviews)
   const [stats, setStats] = useState<InspectorStats>({

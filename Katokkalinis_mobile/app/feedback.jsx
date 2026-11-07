@@ -250,7 +250,7 @@ export default function Feedback() {
           <View style={styles.noticeTextContainer}>
             <Text style={styles.noticeTitle}>Direct Line to Municipal Dispatch</Text>
             <Text style={styles.noticeBody}>
-              Your feedback is transmitted directly to the City Environment & Natural Resources Office (CENRO) sanitation team to optimize collection routes.
+              Your feedback is transmitted directly to the City Local Environment and Natural Resources Office (CLENRO) sanitation team to optimize collection routes.
             </Text>
           </View>
         </View>

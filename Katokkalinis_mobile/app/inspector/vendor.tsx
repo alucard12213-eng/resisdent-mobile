@@ -259,7 +259,9 @@ export default function Vendor() {
                 <View style={styles.detailTextCol}>
                   <Text style={styles.detailLabel}>Stall Market Location</Text>
                   <Text style={styles.detailValue}>
-                    {vendor?.address || vendor?.barangay?.name || "Divisoria Public Market, Section B"}
+                    {vendor?.address
+                      ? vendor.address.replace(/Divisoria|Divi/gi, "Cogon")
+                      : vendor?.barangay?.name || "Cogon Public Market, Section B"}
                   </Text>
                 </View>
               </View>
@@ -468,34 +470,41 @@ export default function Vendor() {
         )}
       </ScrollView>
 
-      {/* 5. BOTTOM NAVIGATION (Matching Image 2 & 3 Green Bar) */}
+      {/* 5. BOTTOM NAVIGATION (Consistent 4-Tab Inspector Navigation) */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={styles.navItem}
+          activeOpacity={0.8}
           onPress={() => router.push("/inspector/dashboard" as any)}
         >
-          <MaterialCommunityIcons name="home-outline" size={24} color="rgba(255, 255, 255, 0.85)" />
+          <MaterialCommunityIcons name="home-outline" size={24} color="#7A8D78" />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.navItem}
+          activeOpacity={0.8}
           onPress={() => router.push("/inspector/inspections" as any)}
         >
-          <MaterialCommunityIcons name="clipboard-check-outline" size={22} color="rgba(255, 255, 255, 0.85)" />
-          <Text style={styles.navText}>Report</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => {}}>
-          <MaterialCommunityIcons name="qrcode-scan" size={24} color="#FFFFFF" />
-          <Text style={[styles.navText, { fontWeight: "800" }]}>Scan</Text>
+          <MaterialCommunityIcons name="clipboard-check" size={24} color="#2E7D32" />
+          <Text style={[styles.navText, styles.navTextActive]}>Inspections</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.navItem}
+          activeOpacity={0.8}
+          onPress={() => router.push("/inspector/history" as any)}
+        >
+          <MaterialCommunityIcons name="history" size={24} color="#7A8D78" />
+          <Text style={styles.navText}>History</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          activeOpacity={0.8}
           onPress={() => router.push("/inspector/profile" as any)}
         >
-          <MaterialCommunityIcons name="account-outline" size={22} color="rgba(255, 255, 255, 0.85)" />
+          <MaterialCommunityIcons name="account-outline" size={24} color="#7A8D78" />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -767,10 +776,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 65,
-    backgroundColor: "#68B93C",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#EEF5ED",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
+    paddingBottom: 4,
   },
 
   navItem: {
@@ -779,8 +791,14 @@ const styles = StyleSheet.create({
   },
 
   navText: {
-    color: "#FFFFFF",
+    color: "#7A8D78",
     fontSize: 10,
     marginTop: 2,
+    fontWeight: "600",
+  },
+
+  navTextActive: {
+    color: "#2E7D32",
+    fontWeight: "800",
   },
 });
