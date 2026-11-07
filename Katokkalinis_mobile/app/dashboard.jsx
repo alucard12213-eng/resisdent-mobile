@@ -85,15 +85,6 @@ const QUICK_ACTIONS = [
     keywords: ["schedule", "pickup", "calendar", "time", "date", "trash", "route"],
   },
   {
-    id: "compliance",
-    label: "Compliance",
-    icon: "leaf-circle-outline",
-    color: "#2E7D32",
-    bg: "#E8F8EE",
-    route: "/compliance",
-    keywords: ["compliance", "segregation", "guidelines", "biodegradable", "recyclable", "residual", "ordinance", "ra 9003"],
-  },
-  {
     id: "post",
     label: "Submit Report",
     icon: "camera-plus-outline",
@@ -392,7 +383,7 @@ export default function Dashboard() {
           <MaterialCommunityIcons name="magnify" size={20} color="#7A8D78" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search schedules, compliance guide, reports, or alerts..."
+            placeholder="Search schedules, reports, notifications, or feedback..."
             placeholderTextColor="#9AA998"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -473,7 +464,7 @@ export default function Dashboard() {
           </View>
         </TouchableOpacity>
 
-        {/* 5. QUICK ACTIONS GRID (Schedule, Compliance, Submit Report, Notifications, Feedback) */}
+        {/* 5. QUICK ACTIONS GRID (Schedule, Submit Report, Notifications, Feedback) */}
         <View style={styles.quickActionsHeaderRow}>
           <Text style={styles.sectionTitle}>
             {searchQuery.trim() ? `Search Results (${displayedActions.length})` : "Quick Actions"}
@@ -502,32 +493,9 @@ export default function Dashboard() {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* 6. CLENRO SEGREGATION COMPLIANCE REMINDER CARD */}
-        <TouchableOpacity
-          style={styles.complianceBanner}
-          activeOpacity={0.88}
-          onPress={() => router.push("/compliance")}
-        >
-          <View style={styles.complianceIconCircle}>
-            <MaterialCommunityIcons name="recycle" size={24} color="#2E7D32" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.complianceTagRow}>
-              <Text style={styles.complianceTagText}>CLENRO • RA 9003</Text>
-            </View>
-            <Text style={styles.complianceBannerTitle}>
-              No Segregation, No Collection
-            </Text>
-            <Text style={styles.complianceBannerSub}>
-              Sort household waste into Biodegradable, Recyclable, Residual, and Special bins 30 mins before pickup.
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color="#2E7D32" />
-        </TouchableOpacity>
       </ScrollView>
 
-      {/* 7. 5-TAB RESIDENT BOTTOM HOTBAR (Home, Schedule, Reports, Compliance, Profile) */}
+      {/* 6. 4-TAB RESIDENT BOTTOM HOTBAR (Home, Schedule, Reports, Profile) */}
       <ResidentHotbar activeTab="home" />
     </View>
   );
@@ -754,13 +722,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actionGridCard: {
-    width: (SCREEN_WIDTH - 52) / 5,
-    minWidth: 58,
+    width: (SCREEN_WIDTH - 52) / 4,
+    minWidth: 68,
     alignItems: "center",
   },
   actionIconBox: {
-    width: 52,
-    height: 52,
+    width: 54,
+    height: 54,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
@@ -769,51 +737,10 @@ const styles = StyleSheet.create({
     borderColor: "#F0F5EE",
   },
   actionLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: "700",
     color: "#2C3E2A",
     textAlign: "center",
-    lineHeight: 13.5,
-  },
-
-  // COMPLIANCE BANNER
-  complianceBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#EAF6E9",
-    borderRadius: 18,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "#CBE7C9",
-    gap: 12,
-  },
-  complianceIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  complianceTagRow: {
-    marginBottom: 2,
-  },
-  complianceTagText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#2E7D32",
-    letterSpacing: 0.5,
-  },
-  complianceBannerTitle: {
-    fontSize: 14.5,
-    fontWeight: "900",
-    color: "#1E331B",
-  },
-  complianceBannerSub: {
-    fontSize: 11.5,
-    color: "#456342",
-    lineHeight: 16,
-    marginTop: 2,
-    fontWeight: "500",
+    lineHeight: 14,
   },
 });

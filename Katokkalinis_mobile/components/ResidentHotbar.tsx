@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 
-export type ResidentTabKey = "home" | "compliance" | "reports" | "schedule" | "profile";
+export type ResidentTabKey = "home" | "schedule" | "reports" | "profile";
 
 interface ResidentHotbarProps {
   activeTab?: ResidentTabKey;
@@ -16,8 +16,6 @@ export default function ResidentHotbar({ activeTab }: ResidentHotbarProps) {
   let currentTab: ResidentTabKey = "home";
   if (activeTab) {
     currentTab = activeTab;
-  } else if (pathname.includes("/compliance")) {
-    currentTab = "compliance";
   } else if (pathname.includes("/report")) {
     currentTab = "reports";
   } else if (pathname.includes("/schedule")) {
@@ -113,31 +111,7 @@ export default function ResidentHotbar({ activeTab }: ResidentHotbarProps) {
         </Text>
       </TouchableOpacity>
 
-      {/* 4. COMPLIANCE */}
-      <TouchableOpacity
-        style={styles.navItem}
-        activeOpacity={0.8}
-        onPress={() => navigateTo("compliance", "/compliance")}
-        accessibilityRole="button"
-        accessibilityLabel="Navigate to Compliance and Segregation Guide"
-      >
-        <MaterialCommunityIcons
-          name={currentTab === "compliance" ? "leaf-circle" : "leaf-circle-outline"}
-          size={23}
-          color={currentTab === "compliance" ? "#2E7D32" : "#7A8D78"}
-        />
-        <Text
-          style={[
-            styles.navItemText,
-            currentTab === "compliance" && styles.navItemTextActive,
-          ]}
-          numberOfLines={1}
-        >
-          Compliance
-        </Text>
-      </TouchableOpacity>
-
-      {/* 5. PROFILE */}
+      {/* 4. PROFILE */}
       <TouchableOpacity
         style={styles.navItem}
         activeOpacity={0.8}
