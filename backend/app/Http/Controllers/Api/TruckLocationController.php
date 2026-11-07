@@ -484,7 +484,12 @@ class TruckLocationController extends Controller
                 ] : null,
                 'today_weight_tons' => round($todayTons, 2),
                 'route_status' => $todayRoute ? $todayRoute->status : ($isOnRoute ? 'in_progress' : 'standby'),
-                'start_time' => $todayRoute?->start_time ? $todayRoute->start_time->format('H:i') : ($isOnRoute ? '08:00' : null),
+                'start_time' => $todayRoute && $todayRoute->getRawOriginal('start_time')
+                    ? substr((string) $todayRoute->getRawOriginal('start_time'), 0, 5)
+                    : ($isOnRoute ? '08:00' : null),
+                'end_time' => $todayRoute && $todayRoute->getRawOriginal('end_time')
+                    ? substr((string) $todayRoute->getRawOriginal('end_time'), 0, 5)
+                    : ($isOnRoute ? '10:00' : null),
             ];
         });
 

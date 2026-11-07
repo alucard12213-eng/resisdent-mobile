@@ -53,4 +53,9 @@ class Vendor extends Model
     {
         return $this->hasMany(Inspection::class);
     }
+
+    public function violations(): HasMany
+    {
+        return $this->hasMany(Violation::class);
+    }
 }

@@ -181,3 +181,214 @@ export async function fetchNotifications() {
 export async function markNotificationAsRead(id: number) {
   return apiRequest(`/notifications/${id}/read`, { method: "PUT" });
 }
+
+/*
+|--------------------------------------------------------------------------
+| COLLECTION ROUTES & LIVE TRUCK GPS TRACKING (Resident Schedule & Route View)
+|--------------------------------------------------------------------------
+*/
+export async function fetchCollectionRoutes(params?: {
+  barangayId?: number | string;
+  barangayName?: string;
+  status?: string;
+}) {
+  const queryParts: string[] = [];
+  if (params?.barangayId) queryParts.push(`barangay_id=${encodeURIComponent(String(params.barangayId))}`);
+  if (params?.barangayName) queryParts.push(`barangay=${encodeURIComponent(params.barangayName)}`);
+  if (params?.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+
+  try {
+    const res = await apiRequest(`/collection-routes${qs}`, { method: "GET" });
+    if (res && res.success) return res;
+  } catch {}
+
+  try {
+    return await apiRequest(`/public/collection-routes${qs}`, { method: "GET" });
+  } catch (err: any) {
+    return {
+      success: false,
+      routes: [],
+      message: err?.message || "Unable to fetch collection routes.",
+    };
+  }
+}
+
+export async function fetchLiveTrucksTracking() {
+  try {
+    const res = await apiRequest("/public/trucks/live-tracking", { method: "GET" });
+    if (res && res.success) return res;
+  } catch {}
+
+  try {
+    return await apiRequest("/trucks/live-tracking", { method: "GET" });
+  } catch (err: any) {
+    return {
+      success: false,
+      trucks: [],
+      routes: [],
+      message: err?.message || "Unable to fetch live truck tracking.",
+    };
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| RESIDENT PUBLIC VENDOR INFORMATION & QR SCANNER (Read-Only, Shared DB)
+|--------------------------------------------------------------------------
+*/
+export interface PublicVendorInspectionSummary {
+  has_inspection: boolean;
+  grade: string;
+  grade_label: string;
+  total_score: number;
+  waste_segregation_score: number;
+  waste_segregation_rating: number;
+  stall_cleanliness_score: number;
+  stall_cleanliness_rating: number;
+  pest_control_score: number;
+  pest_control_rating: number;
+  standing_summary: string;
+  inspected_at: string | null;
+  inspected_at_formatted: string;
+  valid_through: string;
+}
+
+export interface PublicVendorViolationItem {
+  id: number;
+  violation_type: string;
+  penalty: string;
+  status: string;
+  status_label: string;
+  recorded_date: string;
+}
+
+export interface PublicVendorItem {
+  id: number;
+  vendor_code: string;
+  qr_code: string;
+  business_name: string;
+  stall_number: string;
+  market: string;
+  barangay_name: string;
+  status: string;
+  sanitation_grade: string;
+  grade_label: string;
+  compliance_score: number;
+  sanitation_score: number;
+  public_inspection_summary: PublicVendorInspectionSummary;
+  permitted_violations: {
+    active_count: number;
+    resolved_count: number;
+    total_count: number;
+    standing_text: string;
+    items?: PublicVendorViolationItem[];
+  };
+}
+
+export async function fetchPublicVendors(params?: {
+  search?: string;
+  market?: string;
+  grade?: string;
+}): Promise<{
+  success: boolean;
+  count?: number;
+  vendors: PublicVendorItem[];
+  message?: string;
+}> {
+  const queryParts: string[] = [];
+  if (params?.search && params.search.trim()) {
+    queryParts.push(`search=${encodeURIComponent(params.search.trim())}`);
+  }
+  if (params?.market && params.market !== "all") {
+    queryParts.push(`market=${encodeURIComponent(params.market)}`);
+  }
+  if (params?.grade && params.grade !== "all") {
+    queryParts.push(`grade=${encodeURIComponent(params.grade)}`);
+  }
+  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+
+  try {
+    const res = await apiRequest(`/resident/vendors${qs}`, { method: "GET" });
+    if (res && res.success && Array.isArray(res.vendors)) {
+      return res;
+    }
+  } catch {}
+
+  try {
+    const pubRes = await apiRequest(`/public/resident/vendors${qs}`, { method: "GET" });
+    if (pubRes && pubRes.success && Array.isArray(pubRes.vendors)) {
+      return pubRes;
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      vendors: [],
+      message: err?.message || "Unable to fetch public market vendors.",
+    };
+  }
+
+  return {
+    success: false,
+    vendors: [],
+    message: "Unable to fetch public market vendors.",
+  };
+}
+
+export async function fetchPublicVendorDetail(idOrCode: string | number): Promise<{
+  success: boolean;
+  vendor?: PublicVendorItem;
+  error_type?: string;
+  message?: string;
+}> {
+  const encoded = encodeURIComponent(String(idOrCode).trim());
+  try {
+    const res = await apiRequest(`/resident/vendors/${encoded}`, { method: "GET" });
+    if (res && res.success && res.vendor) {
+      return res;
+    }
+    if (res && !res.success) return res;
+  } catch {}
+
+  try {
+    const pubRes = await apiRequest(`/public/resident/vendors/${encoded}`, { method: "GET" });
+    if (pubRes && pubRes.success && pubRes.vendor) {
+      return pubRes;
+    }
+    return pubRes;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Vendor not found.",
+    };
+  }
+}
+
+export async function scanPublicVendorQr(qrCode: string): Promise<{
+  success: boolean;
+  vendor?: PublicVendorItem;
+  error_type?: string;
+  message?: string;
+}> {
+  const payload = JSON.stringify({ qr_code: qrCode.trim() });
+  try {
+    const res = await apiRequest("/resident/vendors/scan-qr", {
+      method: "POST",
+      body: payload,
+    });
+    if (res) return res;
+  } catch {}
+
+  try {
+    return await apiRequest("/public/resident/vendors/scan-qr", {
+      method: "POST",
+      body: payload,
+    });
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Failed to verify vendor QR code.",
+    };
+  }
+}
+

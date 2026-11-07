@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import InitialsAvatar from "../components/InitialsAvatar";
+import ResidentHotbar from "../components/ResidentHotbar";
 import VendorHotbar from "../components/VendorHotbar";
 import { apiRequest, resolveMediaUrl } from "../services/api";
 import { logoutUser } from "../services/auth";
@@ -971,51 +972,7 @@ export default function Profile() {
       {role === "vendor" ? (
         <VendorHotbar activeTab="profile" />
       ) : (
-        <View style={styles.bottomNav}>
-          <TouchableOpacity
-            style={styles.navItem}
-            activeOpacity={0.8}
-            onPress={() => router.replace("/dashboard")}
-          >
-            <MaterialCommunityIcons name="home-outline" size={24} color="#7A8D78" />
-            <Text style={styles.navItemText}>Home</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            activeOpacity={0.8}
-            onPress={() => router.push("/report")}
-          >
-            <MaterialCommunityIcons
-              name="file-document-outline"
-              size={24}
-              color="#7A8D78"
-            />
-            <Text style={styles.navItemText}>Reports</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            activeOpacity={0.8}
-            onPress={() => router.push("/schedule")}
-          >
-            <MaterialCommunityIcons
-              name="calendar-month-outline"
-              size={24}
-              color="#7A8D78"
-            />
-            <Text style={styles.navItemText}>Schedule</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            activeOpacity={0.8}
-            onPress={() => {}}
-          >
-            <MaterialCommunityIcons name="account" size={24} color="#2E7D32" />
-            <Text style={[styles.navItemText, styles.navItemTextActive]}>Profile</Text>
-          </TouchableOpacity>
-        </View>
+        <ResidentHotbar activeTab="profile" />
       )}
     </View>
   );

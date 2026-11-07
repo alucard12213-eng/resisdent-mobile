@@ -10,8 +10,10 @@ use App\Models\Inspection;
 use App\Models\Report;
 use App\Models\Role;
 use App\Models\Truck;
+use App\Models\TruckLocation;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\Violation;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,16 @@ class OverviewDataSeeder extends Seeder
                 'plate_number' => 'KAL-102',
                 'driver_id' => $driver2->id,
                 'truck_type' => 'Dump Truck',
+                'status' => 'on_route',
+            ]
+        );
+
+        $truck3 = Truck::updateOrCreate(
+            ['truck_number' => 'TRK-03'],
+            [
+                'plate_number' => 'KAL-103',
+                'driver_id' => $driver1->id,
+                'truck_type' => 'Compactor Truck',
                 'status' => 'available',
             ]
         );
@@ -65,7 +77,52 @@ class OverviewDataSeeder extends Seeder
                 'plate_number' => 'KAL-104',
                 'driver_id' => $driver3->id,
                 'truck_type' => 'Compactor Truck',
-                'status' => 'available',
+                'status' => 'on_route',
+            ]
+        );
+
+        // Live GPS Locations for Fleet Trucks
+        TruckLocation::updateOrCreate(
+            ['truck_id' => $truck1->id],
+            [
+                'latitude' => 8.48220,
+                'longitude' => 124.64720,
+                'speed' => 14.2,
+                'heading' => 85.0,
+                'recorded_at' => now()->subMinutes(2),
+            ]
+        );
+
+        TruckLocation::updateOrCreate(
+            ['truck_id' => $truck2->id],
+            [
+                'latitude' => 8.47890,
+                'longitude' => 124.64520,
+                'speed' => 18.6,
+                'heading' => 110.0,
+                'recorded_at' => now()->subMinutes(1),
+            ]
+        );
+
+        TruckLocation::updateOrCreate(
+            ['truck_id' => $truck3->id],
+            [
+                'latitude' => 8.48100,
+                'longitude' => 124.65500,
+                'speed' => 0.0,
+                'heading' => 0.0,
+                'recorded_at' => now()->subMinutes(8),
+            ]
+        );
+
+        TruckLocation::updateOrCreate(
+            ['truck_id' => $truck4->id],
+            [
+                'latitude' => 8.47520,
+                'longitude' => 124.65120,
+                'speed' => 21.4,
+                'heading' => 180.0,
+                'recorded_at' => now()->subSeconds(30),
             ]
         );
 
@@ -241,6 +298,32 @@ class OverviewDataSeeder extends Seeder
             ]
         );
 
+        // 7b. Permitted Violations Information in shared violations table
+        $inspV3 = Inspection::where('vendor_id', $v3->id)->latest('inspected_at')->first();
+        $inspV4 = Inspection::where('vendor_id', $v4->id)->latest('inspected_at')->first();
+
+        Violation::updateOrCreate(
+            ['vendor_id' => $v3->id, 'violation_type' => 'Secondary Drainage & Grease Trap Maintenance'],
+            [
+                'inspection_id' => $inspV3?->id,
+                'description' => 'Scheduled grease trap desludging required within 5 days per City Market Sanitation Code.',
+                'penalty' => 'Official Warning',
+                'corrective_action' => 'Clean and desludge stall grease trap within 5 days.',
+                'status' => 'pending',
+            ]
+        );
+
+        Violation::updateOrCreate(
+            ['vendor_id' => $v4->id, 'violation_type' => 'Improper Solid Waste Segregation'],
+            [
+                'inspection_id' => $inspV4?->id,
+                'description' => 'Failure to separate biodegradable and residual packaging in color-coded liners.',
+                'penalty' => 'Sanitary Citation Notice (₱500)',
+                'corrective_action' => 'Provide covered color-coded biodegradable and residual bins immediately.',
+                'status' => 'pending',
+            ]
+        );
+
         // 8. Collection Routes (Today's progress + Past week completed runs with times)
         // Past week runs
         CollectionRoute::updateOrCreate(
@@ -317,6 +400,16 @@ class OverviewDataSeeder extends Seeder
             ]
         );
 
+        CollectionRoute::updateOrCreate(
+            ['truck_id' => $truck2->id, 'collection_date' => $todayStr, 'start_time' => '08:00'],
+            [
+                'barangay_id' => $brgy12->id,
+                'end_time' => '10:30',
+                'status' => 'in_progress',
+                'notes' => 'Route 2 Central Poblacion: Active residential & commercial collection in Barangay 12.',
+            ]
+        );
+
         // 9. Collection Schedules (Upcoming Runs)
         CollectionSchedule::updateOrCreate(
             ['barangay_id' => $brgy1->id, 'date' => $todayStr, 'pickup_time' => '07:00'],
@@ -359,17 +452,19 @@ class OverviewDataSeeder extends Seeder
         );
 
         CollectionSchedule::updateOrCreate(
-            ['barangay_id' => $brgy12->id, 'date' => $todayStr, 'pickup_time' => '15:30'],
+            ['barangay_id' => $brgy12->id, 'date' => $todayStr, 'pickup_time' => '08:00'],
             [
                 'day' => $today->format('l'),
-                'schedule_type' => 'Secondary Residential',
-                'status' => 'scheduled',
+                'schedule_type' => 'Central Poblacion Residential & Commercial',
+                'status' => 'in_progress',
                 'active' => true,
             ]
         );
 
-        // Future Upcoming Runs
+        // Future Upcoming Runs across Barangays 1-40 so every barangay has an active schedule
         $tomorrow = $today->copy()->addDay();
+        $dayAfter = $today->copy()->addDays(2);
+
         CollectionSchedule::updateOrCreate(
             ['barangay_id' => $brgy1->id, 'date' => $tomorrow->toDateString(), 'pickup_time' => '08:00'],
             [
@@ -380,7 +475,6 @@ class OverviewDataSeeder extends Seeder
             ]
         );
 
-        $dayAfter = $today->copy()->addDays(2);
         CollectionSchedule::updateOrCreate(
             ['barangay_id' => $brgy2->id, 'date' => $dayAfter->toDateString(), 'pickup_time' => '08:30'],
             [
@@ -390,6 +484,57 @@ class OverviewDataSeeder extends Seeder
                 'active' => true,
             ]
         );
+
+        CollectionSchedule::updateOrCreate(
+            ['barangay_id' => $brgy12->id, 'date' => $tomorrow->toDateString(), 'pickup_time' => '08:00'],
+            [
+                'day' => $tomorrow->format('l'),
+                'schedule_type' => 'Biodegradable & Residual Collection',
+                'status' => 'scheduled',
+                'active' => true,
+            ]
+        );
+
+        CollectionSchedule::updateOrCreate(
+            ['barangay_id' => $brgy12->id, 'date' => $dayAfter->toDateString(), 'pickup_time' => '13:30'],
+            [
+                'day' => $dayAfter->format('l'),
+                'schedule_type' => 'Recyclable & Market Corridor Run',
+                'status' => 'scheduled',
+                'active' => true,
+            ]
+        );
+
+        for ($num = 1; $num <= 40; $num++) {
+            $b = Barangay::where('name', "Barangay {$num}")->first();
+            if (!$b) {
+                continue;
+            }
+            $sectorTruck = $num <= 10 ? $truck1 : ($num <= 20 ? $truck2 : ($num <= 30 ? $truck3 : $truck4));
+            $offsetDays = ($num % 3);
+            $schedDate = $today->copy()->addDays($offsetDays);
+            $pickupTime = ($num % 2 === 0) ? '08:00' : '09:30';
+
+            CollectionSchedule::firstOrCreate(
+                ['barangay_id' => $b->id, 'date' => $schedDate->toDateString(), 'pickup_time' => $pickupTime],
+                [
+                    'day' => $schedDate->format('l'),
+                    'schedule_type' => 'Scheduled Municipal Solid Waste Collection',
+                    'status' => $offsetDays === 0 ? 'in_progress' : 'scheduled',
+                    'active' => true,
+                ]
+            );
+
+            CollectionRoute::firstOrCreate(
+                ['truck_id' => $sectorTruck->id, 'barangay_id' => $b->id, 'collection_date' => $schedDate->toDateString()],
+                [
+                    'start_time' => $pickupTime,
+                    'end_time' => ($num % 2 === 0) ? '10:30' : '12:00',
+                    'status' => $offsetDays === 0 ? 'in_progress' : 'pending',
+                    'notes' => "Assigned Route Corridor run for Barangay {$num}.",
+                ]
+            );
+        }
 
         // 10. Reports (Active issues + Pending review)
         Report::updateOrCreate(

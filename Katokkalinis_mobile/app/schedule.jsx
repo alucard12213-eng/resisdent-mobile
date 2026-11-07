@@ -16,7 +16,13 @@ import {
 import BarangayPickerModal, {
   BARANGAYS_1_TO_40,
 } from "../components/BarangayPickerModal";
-import { fetchSchedules } from "../services/resident";
+import LiveRouteMapView from "../components/LiveRouteMapView";
+import ResidentHotbar from "../components/ResidentHotbar";
+import {
+  fetchCollectionRoutes,
+  fetchLiveTrucksTracking,
+  fetchSchedules,
+} from "../services/resident";
 
 const DAYS_OF_WEEK = [
   "Monday",
@@ -38,12 +44,76 @@ const DAY_ORDER = {
   Sunday: 7,
 };
 
+function safeString(val, fallback = "") {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    if (typeof val.name === "string") return val.name;
+    if (typeof val.label === "string") return val.label;
+    if (typeof val.title === "string") return val.title;
+  }
+  return fallback;
+}
+
+function extractBarangayName(item, fallback = "Barangay 12") {
+  if (!item) return safeString(fallback, "Barangay 12");
+  if (typeof item === "string") return item;
+  if (typeof item.barangay_name === "string" && item.barangay_name.trim()) {
+    return item.barangay_name.trim();
+  }
+  if (typeof item.barangay === "string" && item.barangay.trim()) {
+    return item.barangay.trim();
+  }
+  if (item.barangay && typeof item.barangay === "object" && typeof item.barangay.name === "string") {
+    return item.barangay.name.trim();
+  }
+  if (typeof item.name === "string" && item.name.trim()) {
+    return item.name.trim();
+  }
+  return safeString(fallback, "Barangay 12");
+}
+
+function extractRouteName(item, fallbackRouteNumber = 1) {
+  if (!item) return `Route ${fallbackRouteNumber}`;
+  if (typeof item.route_name === "string" && item.route_name.trim()) {
+    return item.route_name.trim();
+  }
+  if (typeof item.route === "string" && item.route.trim()) {
+    return item.route.trim();
+  }
+  if (item.route && typeof item.route === "object" && typeof item.route.name === "string") {
+    return item.route.name.trim();
+  }
+  return `Route ${fallbackRouteNumber}`;
+}
+
+function extractTruckLabel(item, fallbackTruck = null) {
+  const truckObj =
+    (item && typeof item.assigned_truck === "object" && item.assigned_truck) ||
+    (item && typeof item.truck === "object" && item.truck) ||
+    fallbackTruck;
+
+  if (!truckObj) {
+    if (item && typeof item.truck === "string") return item.truck;
+    return "Assigned Compactor Unit";
+  }
+
+  const num = safeString(truckObj.truck_number, "");
+  const plate = safeString(truckObj.plate_number, "");
+  if (num && plate) return `${num} (${plate})`;
+  if (plate) return plate;
+  if (num) return num;
+  return safeString(truckObj.name, "Assigned Compactor Unit");
+}
+
 function formatTime12(timeStr) {
   if (!timeStr) return "08:00 AM";
-  const clean = String(timeStr).trim();
+  const clean = safeString(timeStr, "08:00").trim();
   const parts = clean.split(":");
   if (parts.length < 2) return clean;
   let hour = parseInt(parts[0], 10);
+  if (isNaN(hour)) return clean;
   const minute = parts[1].slice(0, 2);
   const ampm = hour >= 12 ? "PM" : "AM";
   hour = hour % 12 || 12;
@@ -51,9 +121,10 @@ function formatTime12(timeStr) {
 }
 
 function formatDateDisplay(dateStr) {
-  if (!dateStr) return "";
+  const raw = safeString(dateStr, "");
+  if (!raw) return "";
   try {
-    const cleanStr = String(dateStr).slice(0, 10);
+    const cleanStr = raw.slice(0, 10);
     const d = new Date(cleanStr + "T00:00:00");
     if (isNaN(d.getTime())) return cleanStr;
     return d.toLocaleDateString("en-US", {
@@ -62,17 +133,19 @@ function formatDateDisplay(dateStr) {
       year: "numeric",
     });
   } catch {
-    return String(dateStr).slice(0, 10);
+    return raw.slice(0, 10);
   }
 }
 
 function getDayFromItem(item) {
-  if (item.day && item.day.trim()) {
-    return item.day.trim();
+  const dayRaw = safeString(item?.day, "").trim();
+  if (dayRaw) {
+    return dayRaw;
   }
-  if (item.date) {
+  const dateSource = safeString(item?.collection_date || item?.date, "");
+  if (dateSource) {
     try {
-      const cleanStr = String(item.date).slice(0, 10);
+      const cleanStr = dateSource.slice(0, 10);
       const d = new Date(cleanStr + "T00:00:00");
       if (!isNaN(d.getTime())) {
         return d.toLocaleDateString("en-US", { weekday: "long" });
@@ -82,18 +155,62 @@ function getDayFromItem(item) {
   return "Monday";
 }
 
+function formatStatusLabel(statusRaw) {
+  const s = safeString(statusRaw, "scheduled").toLowerCase();
+  if (s === "completed") return "Completed";
+  if (s === "in_progress") return "In Progress";
+  if (s === "delayed") return "Delayed";
+  if (s === "cancelled") return "Cancelled";
+  return "Scheduled";
+}
+
+function normalizeScheduleItem(raw, fallbackBarangayName) {
+  if (!raw || typeof raw !== "object") return null;
+  const barangayName = extractBarangayName(raw, fallbackBarangayName);
+  const routeNumber = Number(raw.route_number) || 1;
+  const routeName = extractRouteName(raw, routeNumber);
+  const statusStr = safeString(raw.collection_status || raw.status, "scheduled").toLowerCase();
+  const collectionDate = safeString(raw.collection_date || raw.date, "").slice(0, 10);
+  const startTime = safeString(raw.start_time || raw.pickup_time, "08:00").slice(0, 5);
+  const endTime = safeString(raw.end_time, "10:00").slice(0, 5);
+  const stops = Array.isArray(raw.route_stops)
+    ? raw.route_stops.map((s) => safeString(s)).filter(Boolean)
+    : [];
+
+  return {
+    ...raw,
+    id: raw.id ?? `${barangayName}-${collectionDate}-${startTime}`,
+    barangay_name: barangayName,
+    route_number: routeNumber,
+    route_name: routeName,
+    collection_date: collectionDate,
+    date: collectionDate,
+    start_time: startTime,
+    pickup_time: startTime,
+    end_time: endTime,
+    collection_status: statusStr,
+    status: statusStr,
+    notes: safeString(raw.notes, ""),
+    schedule_type: safeString(raw.schedule_type, "Municipal Waste Collection"),
+    estimated_arrival: safeString(raw.estimated_arrival, "") || null,
+    route_stops: stops,
+  };
+}
+
 function sortSchedulesChronologically(list) {
   if (!Array.isArray(list)) return [];
   return [...list].sort((a, b) => {
-    const dateA = a.date ? String(a.date).slice(0, 10) : "";
-    const dateB = b.date ? String(b.date).slice(0, 10) : "";
+    const dateA = safeString(a.collection_date || a.date, "").slice(0, 10);
+    const dateB = safeString(b.collection_date || b.date, "").slice(0, 10);
     if (dateA && dateB && dateA !== dateB) {
       return dateA.localeCompare(dateB);
     }
     const dayA = DAY_ORDER[getDayFromItem(a)] || 99;
     const dayB = DAY_ORDER[getDayFromItem(b)] || 99;
     if (dayA !== dayB) return dayA - dayB;
-    return (a.pickup_time || "").localeCompare(b.pickup_time || "");
+    return safeString(a.start_time || a.pickup_time, "").localeCompare(
+      safeString(b.start_time || b.pickup_time, "")
+    );
   });
 }
 
@@ -101,11 +218,18 @@ export default function Schedule() {
   const router = useRouter();
 
   const [selectedBarangay, setSelectedBarangay] = useState(BARANGAYS_1_TO_40[11]); // Default to Barangay 12
-  const [viewMode, setViewMode] = useState("days");
+  const [viewMode, setViewMode] = useState("days"); // "days" | "date" | "routes"
   const [schedules, setSchedules] = useState([]);
+  const [collectionRoutes, setCollectionRoutes] = useState([]);
+  const [liveTrucks, setLiveTrucks] = useState([]);
+  const [showLiveMap, setShowLiveMap] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reminderActive, setReminderActive] = useState(false);
+
+  const selectedBarangayName = extractBarangayName(selectedBarangay, "Barangay 12");
+  const selectedBarangayId = Number(selectedBarangay?.id) || 12;
 
   // Load user's registered barangay from storage
   useEffect(() => {
@@ -113,7 +237,15 @@ export default function Schedule() {
       try {
         const stored = await AsyncStorage.getItem("userBarangay");
         if (stored) {
-          const match = stored.match(/(\d+)/);
+          let parsedStr = stored;
+          try {
+            const maybeObj = JSON.parse(stored);
+            if (maybeObj && typeof maybeObj === "object") {
+              parsedStr = safeString(maybeObj.name || maybeObj.id, stored);
+            }
+          } catch {}
+
+          const match = String(parsedStr).match(/(\d+)/);
           if (match) {
             const id = parseInt(match[1], 10);
             if (id >= 1 && id <= 40) {
@@ -130,48 +262,83 @@ export default function Schedule() {
 
   // Sync reminder state for selected barangay
   useEffect(() => {
-    AsyncStorage.getItem(`@schedule_reminder_${selectedBarangay.id}`).then((val) => {
-      setReminderActive(val === "true");
-    }).catch(() => {});
-  }, [selectedBarangay.id]);
+    AsyncStorage.getItem(`@schedule_reminder_${selectedBarangayId}`)
+      .then((val) => {
+        setReminderActive(val === "true");
+      })
+      .catch(() => {});
+  }, [selectedBarangayId]);
 
-  const loadSchedules = useCallback(
+  const loadSchedulesAndRoutes = useCallback(
     async (isSilent = false) => {
       try {
-        if (!isSilent) setLoading(true);
-        const res = await fetchSchedules(selectedBarangay.id, selectedBarangay.name);
+        if (!isSilent) {
+          setLoading(true);
+          setErrorMessage(null);
+        }
 
-        if (res && res.success && Array.isArray(res.schedules)) {
-          // Strictly use real schedules from the backend
-          setSchedules(sortSchedulesChronologically(res.schedules));
+        const [schedRes, routesRes, trucksRes] = await Promise.all([
+          fetchSchedules(selectedBarangayId, selectedBarangayName),
+          fetchCollectionRoutes({
+            barangayId: selectedBarangayId,
+            barangayName: selectedBarangayName,
+          }),
+          fetchLiveTrucksTracking(),
+        ]);
+
+        if (schedRes && schedRes.success && Array.isArray(schedRes.schedules)) {
+          const normalized = schedRes.schedules
+            .map((item) => normalizeScheduleItem(item, selectedBarangayName))
+            .filter(Boolean);
+          setSchedules(sortSchedulesChronologically(normalized));
+        } else if (schedRes && schedRes.success === false) {
+          setSchedules([]);
+          if (!isSilent) {
+            setErrorMessage(schedRes.message || "Unable to load collection schedules.");
+          }
         } else {
           setSchedules([]);
         }
+
+        if (routesRes && routesRes.success && Array.isArray(routesRes.routes)) {
+          const normalizedRoutes = routesRes.routes
+            .map((item) => normalizeScheduleItem(item, selectedBarangayName))
+            .filter(Boolean);
+          setCollectionRoutes(normalizedRoutes);
+        } else {
+          setCollectionRoutes([]);
+        }
+
+        if (trucksRes && trucksRes.success && Array.isArray(trucksRes.trucks)) {
+          setLiveTrucks(trucksRes.trucks);
+        }
       } catch (error) {
-        console.warn("Schedule load error:", error);
-        setSchedules([]);
+        console.warn("Schedule & route load error:", error);
+        if (!isSilent) {
+          setErrorMessage("Could not connect to the schedule server. Please check your connection and try again.");
+        }
       } finally {
         if (!isSilent) setLoading(false);
       }
     },
-    [selectedBarangay.id, selectedBarangay.name]
+    [selectedBarangayId, selectedBarangayName]
   );
 
   useEffect(() => {
-    loadSchedules();
-  }, [loadSchedules]);
+    loadSchedulesAndRoutes();
+  }, [loadSchedulesAndRoutes]);
 
-  // Live Auto-Refresh (Polls backend every 8s so when web schedule changes, mobile updates automatically)
+  // Live Auto-Refresh (Polls backend every 8s)
   useEffect(() => {
     const timer = setInterval(() => {
-      loadSchedules(true);
+      loadSchedulesAndRoutes(true);
     }, 8000);
     return () => clearInterval(timer);
-  }, [loadSchedules]);
+  }, [loadSchedulesAndRoutes]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadSchedules(true);
+    await loadSchedulesAndRoutes(true);
     setRefreshing(false);
   };
 
@@ -179,15 +346,20 @@ export default function Schedule() {
     const nextState = !reminderActive;
     setReminderActive(nextState);
     try {
-      await AsyncStorage.setItem(`@schedule_reminder_${selectedBarangay.id}`, String(nextState));
+      await AsyncStorage.setItem(
+        `@schedule_reminder_${selectedBarangayId}`,
+        String(nextState)
+      );
     } catch {}
 
     if (nextState) {
       try {
-        const { triggerLocalNotification } = await import("../services/pushNotification");
+        const { triggerLocalNotification } = await import(
+          "../services/pushNotification"
+        );
         await triggerLocalNotification(
           "Collection Reminder Activated",
-          `Push notifications enabled for ${selectedBarangay.name}. You will be alerted before compactor runs.`
+          `Push notifications enabled for ${selectedBarangayName}. You will be alerted before compactor runs.`
         );
       } catch (err) {
         console.warn("Could not fire local push notification:", err);
@@ -195,14 +367,176 @@ export default function Schedule() {
 
       Alert.alert(
         "Push Reminder Enabled",
-        `You will receive a push notification alert before scheduled collections in ${selectedBarangay.name}.`
+        `You will receive a push notification alert before scheduled collections in ${selectedBarangayName}.`
       );
     } else {
       Alert.alert(
         "Reminder Disabled",
-        `Collection reminders turned off for ${selectedBarangay.name}.`
+        `Collection reminders turned off for ${selectedBarangayName}.`
       );
     }
+  };
+
+  // Determine canonical Route Number (1..4) for selected barangay (1-10 => 1, 11-20 => 2, 21-30 => 3, 31-40 => 4)
+  const activeRouteNumber = Math.min(4, Math.max(1, Math.ceil(selectedBarangayId / 10)));
+  const primarySchedule = schedules[0] || null;
+  const primaryRoute = collectionRoutes[0] || null;
+  const activeAssignedTruck =
+    primarySchedule?.assigned_truck ||
+    primaryRoute?.assigned_truck ||
+    liveTrucks.find((t) => Number(t.id) === activeRouteNumber) ||
+    liveTrucks[0] ||
+    null;
+  const activeTruckGps =
+    primarySchedule?.current_truck_location ||
+    primaryRoute?.current_truck_location ||
+    activeAssignedTruck?.current_location ||
+    (activeAssignedTruck?.latitude != null && activeAssignedTruck?.longitude != null
+      ? {
+          latitude: Number(activeAssignedTruck.latitude),
+          longitude: Number(activeAssignedTruck.longitude),
+          speed: activeAssignedTruck.speed ?? null,
+          recorded_at: activeAssignedTruck.last_updated || null,
+          gps_available: true,
+          is_live: Boolean(activeAssignedTruck.is_live),
+        }
+      : null);
+
+  const renderRouteAndTruckDetails = (item, includeStops = false) => {
+    const collectionDate = formatDateDisplay(item.collection_date || item.date) || "Scheduled";
+    const startTime = formatTime12(item.start_time || item.pickup_time);
+    const endTime = item.end_time ? formatTime12(item.end_time) : "10:00 AM";
+    const barangayLabel = extractBarangayName(item, selectedBarangayName);
+    const routeName = extractRouteName(item, activeRouteNumber);
+    const truckLabel = extractTruckLabel(item, activeAssignedTruck);
+    const collectionStatus = formatStatusLabel(item.collection_status || item.status);
+    const gpsLoc =
+      item.current_truck_location ||
+      item.assigned_truck?.current_location ||
+      activeTruckGps;
+    const isLiveGpsSupported = Boolean(
+      gpsLoc &&
+        gpsLoc.gps_available &&
+        gpsLoc.latitude != null &&
+        gpsLoc.longitude != null
+    );
+    const gpsEta =
+      isLiveGpsSupported && gpsLoc.is_live && item.estimated_arrival
+        ? safeString(item.estimated_arrival, "")
+        : "";
+    const stopsList =
+      Array.isArray(item.route_stops) && item.route_stops.length > 0
+        ? item.route_stops
+        : [];
+
+    return (
+      <View style={styles.detailGridBox}>
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="calendar-check-outline" size={14} color="#2E7D32" />
+          <Text style={styles.detailKeyText}>Collection Date:</Text>
+          <Text style={styles.detailValText}>{collectionDate}</Text>
+        </View>
+
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="clock-start" size={14} color="#1565C0" />
+          <Text style={styles.detailKeyText}>Scheduled Time:</Text>
+          <Text style={styles.detailValText}>
+            {startTime} – {endTime} (Planned Window)
+          </Text>
+        </View>
+
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="home-city-outline" size={14} color="#2E7D32" />
+          <Text style={styles.detailKeyText}>Barangay:</Text>
+          <Text style={styles.detailValText}>{barangayLabel}</Text>
+        </View>
+
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="map-marker-path" size={14} color="#6A1B9A" />
+          <Text style={styles.detailKeyText}>Collection Route:</Text>
+          <Text style={styles.detailValText} numberOfLines={1}>
+            {routeName}
+          </Text>
+        </View>
+
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="truck-fast-outline" size={14} color="#D84315" />
+          <Text style={styles.detailKeyText}>Assigned Truck:</Text>
+          <Text style={styles.detailValText}>{truckLabel}</Text>
+        </View>
+
+        <View style={styles.detailRowItem}>
+          <MaterialCommunityIcons name="progress-check" size={14} color="#2E7D32" />
+          <Text style={styles.detailKeyText}>Collection Status:</Text>
+          <Text style={styles.detailValText}>{collectionStatus}</Text>
+        </View>
+
+        {includeStops && stopsList.length > 0 && (
+          <View style={styles.stopsContainer}>
+            <View style={styles.stopsHeaderRow}>
+              <MaterialCommunityIcons name="sign-direction" size={13} color="#1E5822" />
+              <Text style={styles.stopsHeaderText}>
+                Collection Stops ({stopsList.length} Barangays):
+              </Text>
+            </View>
+            <View style={styles.stopsChipsWrap}>
+              {stopsList.map((stopName, sIdx) => {
+                const isSelectedStop =
+                  stopName.toLowerCase() === selectedBarangayName.toLowerCase();
+                return (
+                  <View
+                    key={`${stopName}-${sIdx}`}
+                    style={[
+                      styles.stopChip,
+                      isSelectedStop && styles.stopChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.stopChipText,
+                        isSelectedStop && styles.stopChipTextActive,
+                      ]}
+                    >
+                      {sIdx + 1}. {stopName}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {isLiveGpsSupported ? (
+          <View style={styles.gpsTelemetryBox}>
+            <View style={styles.gpsTelemetryLeft}>
+              <View style={styles.gpsPulseDot} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gpsTelemetryTitle}>
+                  Current Truck Location (Live GPS Available)
+                </Text>
+                <Text style={styles.gpsTelemetryCoords}>
+                  Lat {Number(gpsLoc.latitude).toFixed(5)}, Lng {Number(gpsLoc.longitude).toFixed(5)}
+                  {gpsLoc.speed != null ? ` • ${Number(gpsLoc.speed).toFixed(1)} km/h` : ""}
+                  {gpsLoc.time_ago ? ` • ${safeString(gpsLoc.time_ago)}` : ""}
+                </Text>
+                {gpsEta ? (
+                  <Text style={styles.gpsEtaText}>
+                    Estimated Arrival (GPS-Based): {gpsEta}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.gpsStandbyRow}>
+            <MaterialCommunityIcons name="crosshairs-gps" size={13} color="#78909C" />
+            <Text style={styles.gpsStandbyText}>
+              Truck GPS Location: Standby (Estimated arrival shown only when live GPS is active)
+            </Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -217,7 +551,7 @@ export default function Schedule() {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#1E331B" />
         </TouchableOpacity>
 
-        <Text style={styles.screenTitle}>Collection Schedule</Text>
+        <Text style={styles.screenTitle}>Collection Route & Schedule</Text>
 
         <TouchableOpacity
           style={styles.calendarActionButton}
@@ -244,7 +578,7 @@ export default function Schedule() {
           />
         }
       >
-        {/* VIEW MODE TOGGLE (Monday to Sunday VS By Date) */}
+        {/* VIEW MODE TOGGLE (Weekly Days | By Date | Route & GPS) */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity
             style={[styles.toggleBtn, viewMode === "days" && styles.toggleBtnActive]}
@@ -253,9 +587,9 @@ export default function Schedule() {
           >
             <MaterialCommunityIcons
               name="calendar-week"
-              size={16}
+              size={15}
               color={viewMode === "days" ? "#1E5822" : "#688264"}
-              style={{ marginRight: 6 }}
+              style={{ marginRight: 5 }}
             />
             <Text
               style={[
@@ -263,7 +597,7 @@ export default function Schedule() {
                 viewMode === "days" && styles.toggleBtnTextActive,
               ]}
             >
-              Monday to Sunday
+              Mon – Sun
             </Text>
           </TouchableOpacity>
 
@@ -274,9 +608,9 @@ export default function Schedule() {
           >
             <MaterialCommunityIcons
               name="calendar-month"
-              size={16}
+              size={15}
               color={viewMode === "date" ? "#1E5822" : "#688264"}
-              style={{ marginRight: 6 }}
+              style={{ marginRight: 5 }}
             />
             <Text
               style={[
@@ -287,51 +621,154 @@ export default function Schedule() {
               By Date
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.toggleBtn, viewMode === "routes" && styles.toggleBtnActive]}
+            onPress={() => setViewMode("routes")}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="map-marker-path"
+              size={15}
+              color={viewMode === "routes" ? "#1E5822" : "#688264"}
+              style={{ marginRight: 5 }}
+            />
+            <Text
+              style={[
+                styles.toggleBtnText,
+                viewMode === "routes" && styles.toggleBtnTextActive,
+              ]}
+            >
+              Route & GPS
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* BARANGAY SELECTOR MODAL (1–40) */}
         <View style={styles.selectorSection}>
           <Text style={styles.selectorLabel}>Select Barangay Location</Text>
           <BarangayPickerModal
-            selectedBarangay={selectedBarangay.name}
+            selectedBarangay={selectedBarangayName}
             onSelect={(item) => setSelectedBarangay(item)}
           />
         </View>
 
-        {/* ACTIVE BARANGAY CARD */}
+        {/* ACTIVE BARANGAY & ASSIGNED ROUTE SUMMARY BANNER */}
         <View style={styles.activeBanner}>
-          <View style={styles.bannerIconBox}>
-            <MaterialCommunityIcons name="truck-fast-outline" size={24} color="#2E7D32" />
+          <View style={styles.bannerTopRow}>
+            <View style={styles.bannerIconBox}>
+              <MaterialCommunityIcons name="truck-fast-outline" size={24} color="#2E7D32" />
+            </View>
+            <View style={styles.bannerText}>
+              <Text style={styles.bannerTitle}>Active Collection Area & Corridor</Text>
+              <Text style={styles.bannerBarangay}>{selectedBarangayName}</Text>
+              <Text style={styles.bannerRouteSub}>
+                {extractRouteName(primarySchedule || primaryRoute, activeRouteNumber)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.refreshIconBtn}
+              onPress={handleRefresh}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="sync" size={18} color="#2E7D32" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.bannerText}>
-            <Text style={styles.bannerTitle}>Active Collection Area</Text>
-            <Text style={styles.bannerBarangay}>{selectedBarangay.name}</Text>
+
+          {/* LIVE TRUCK GPS TELEMETRY & MAP TOGGLE */}
+          <View style={styles.bannerTelemetryBar}>
+            <View style={styles.bannerTelemetryInfo}>
+              <MaterialCommunityIcons
+                name={activeTruckGps?.gps_available ? "satellite-uplink" : "truck-check-outline"}
+                size={16}
+                color="#1E5822"
+              />
+              <Text style={styles.bannerTelemetryText} numberOfLines={2}>
+                {`Assigned: ${extractTruckLabel(primarySchedule || primaryRoute, activeAssignedTruck)}`}
+                {activeTruckGps?.gps_available &&
+                activeTruckGps.latitude != null &&
+                activeTruckGps.longitude != null
+                  ? ` • GPS: ${Number(activeTruckGps.latitude).toFixed(4)}, ${Number(
+                      activeTruckGps.longitude
+                    ).toFixed(4)}`
+                  : ""}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.mapTogglePill}
+              onPress={() => setShowLiveMap((prev) => !prev)}
+            >
+              <MaterialCommunityIcons
+                name={showLiveMap ? "map-check" : "map-outline"}
+                size={14}
+                color="#FFFFFF"
+              />
+              <Text style={styles.mapTogglePillText}>
+                {showLiveMap ? "Hide Map" : "Live Map"}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.refreshIconBtn}
-            onPress={handleRefresh}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MaterialCommunityIcons name="sync" size={18} color="#2E7D32" />
-          </TouchableOpacity>
         </View>
 
-        {/* SCHEDULE LIST HEADER */}
+        {/* EMBEDDED LIVE ROUTE & TRUCK GPS MAP */}
+        {showLiveMap && (
+          <View style={styles.mapSectionCard}>
+            <View style={styles.mapSectionHeader}>
+              <View style={styles.mapSectionTitleRow}>
+                <MaterialCommunityIcons name="radar" size={18} color="#15803D" />
+                <Text style={styles.mapSectionTitle}>
+                  Live Truck GPS & Collection Route Map
+                </Text>
+              </View>
+              <Text style={styles.mapSectionTag}>Route #{activeRouteNumber}</Text>
+            </View>
+            <LiveRouteMapView
+              height={220}
+              selectedRouteId={activeRouteNumber}
+              compact={false}
+            />
+          </View>
+        )}
+
+        {/* SCHEDULE / ROUTE LIST HEADER */}
         <View style={styles.scheduleHeaderRow}>
           <Text style={styles.sectionTitle}>
             {viewMode === "days"
               ? "Weekly Days (Monday – Sunday)"
-              : "Chronological Calendar Dates"}
+              : viewMode === "date"
+              ? "Chronological Calendar Dates"
+              : "Active Collection Routes & Stops"}
           </Text>
           <Text style={styles.scheduleCount}>
-            {schedules.length} {schedules.length === 1 ? "Schedule" : "Schedules"}
+            {viewMode === "routes"
+              ? `${collectionRoutes.length} ${collectionRoutes.length === 1 ? "Route" : "Routes"}`
+              : `${schedules.length} ${schedules.length === 1 ? "Schedule" : "Schedules"}`}
           </Text>
         </View>
 
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#2E7D32" />
-            <Text style={styles.loadingText}>Syncing schedule from city portal...</Text>
+            <Text style={styles.loadingText}>
+              Syncing collection routes, schedules, and truck GPS...
+            </Text>
+          </View>
+        ) : errorMessage ? (
+          <View style={styles.emptyCard}>
+            <View style={[styles.emptyIconCircle, { backgroundColor: "#FFEBEE" }]}>
+              <MaterialCommunityIcons
+                name="alert-circle-outline"
+                size={36}
+                color="#C62828"
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Unable to Load Schedule</Text>
+            <Text style={styles.emptySub}>{errorMessage}</Text>
+            <TouchableOpacity style={styles.emptyRefreshBtn} onPress={() => loadSchedulesAndRoutes(false)}>
+              <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" />
+              <Text style={styles.emptyRefreshText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : viewMode === "days" ? (
           /* ========================================================
@@ -393,67 +830,64 @@ export default function Schedule() {
                   {hasSchedules ? (
                     <View style={styles.dayRunsContainer}>
                       {daySchedules.map((run, rIdx) => {
-                        const isCompleted = run.status === "completed";
-                        const isInProgress = run.status === "in_progress";
-                        const displayTime = formatTime12(run.pickup_time);
-                        const displayDate = run.date ? formatDateDisplay(run.date) : "";
+                        const rawStatus = safeString(run.collection_status || run.status, "scheduled");
+                        const isCompleted = rawStatus === "completed";
+                        const isInProgress = rawStatus === "in_progress";
+                        const startTime = formatTime12(run.start_time || run.pickup_time);
+                        const endTime = run.end_time ? formatTime12(run.end_time) : "10:00 AM";
 
                         return (
                           <View
-                            key={run.id ? String(run.id) : `${dayName}-${rIdx}`}
+                            key={`${String(run.id)}-${dayName}-${rIdx}`}
                             style={[
-                              styles.runItemRow,
+                              styles.runItemBlock,
                               rIdx > 0 && styles.runItemBorder,
                             ]}
                           >
-                            <View style={styles.runItemLeft}>
+                            <View style={styles.runItemTopRow}>
                               <View style={styles.timeTag}>
                                 <MaterialCommunityIcons
                                   name="clock-outline"
                                   size={14}
                                   color="#2E7D32"
                                 />
-                                <Text style={styles.timeTagText}>{displayTime}</Text>
+                                <Text style={styles.timeTagText}>
+                                  {startTime} – {endTime}
+                                </Text>
                               </View>
-                              {displayDate ? (
-                                <Text style={styles.runDateText}>
-                                  Scheduled: {displayDate}
-                                </Text>
-                              ) : null}
-                              {run.notes ? (
-                                <Text style={styles.runNotesText} numberOfLines={2}>
-                                  {run.notes}
-                                </Text>
-                              ) : null}
-                            </View>
 
-                            <View
-                              style={[
-                                styles.statusBadge,
-                                isCompleted
-                                  ? styles.statusBadgeCompleted
-                                  : isInProgress
-                                  ? styles.statusBadgeInProgress
-                                  : styles.statusBadgeScheduled,
-                              ]}
-                            >
-                              <Text
+                              <View
                                 style={[
-                                  styles.statusBadgeText,
+                                  styles.statusBadge,
                                   isCompleted
-                                    ? styles.statusTextCompleted
+                                    ? styles.statusBadgeCompleted
                                     : isInProgress
-                                    ? styles.statusTextInProgress
-                                    : styles.statusTextScheduled,
+                                    ? styles.statusBadgeInProgress
+                                    : styles.statusBadgeScheduled,
                                 ]}
                               >
-                                {isCompleted
-                                  ? "Completed"
-                                  : isInProgress
-                                  ? "In Progress"
-                                  : "Scheduled"}
-                              </Text>
+                                <Text
+                                  style={[
+                                    styles.statusBadgeText,
+                                    isCompleted
+                                      ? styles.statusTextCompleted
+                                      : isInProgress
+                                      ? styles.statusTextInProgress
+                                      : styles.statusTextScheduled,
+                                  ]}
+                                >
+                                  {formatStatusLabel(rawStatus)}
+                                </Text>
+                              </View>
                             </View>
+
+                            {renderRouteAndTruckDetails(run, false)}
+
+                            {run.notes ? (
+                              <Text style={styles.runNotesText} numberOfLines={2}>
+                                Note: {safeString(run.notes)}
+                              </Text>
+                            ) : null}
                           </View>
                         );
                       })}
@@ -463,7 +897,7 @@ export default function Schedule() {
               );
             })}
           </View>
-        ) : (
+        ) : viewMode === "date" ? (
           /* ========================================================
              MODE 2: BY DATE VIEW
              ======================================================== */
@@ -478,7 +912,8 @@ export default function Schedule() {
               </View>
               <Text style={styles.emptyTitle}>No Scheduled Dates</Text>
               <Text style={styles.emptySub}>
-                There is currently no garbage collection schedule listed for {selectedBarangay.name} on the official web calendar.
+                There is currently no garbage collection schedule listed for{" "}
+                {selectedBarangayName} on the official web calendar.
               </Text>
               <TouchableOpacity style={styles.emptyRefreshBtn} onPress={handleRefresh}>
                 <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" />
@@ -488,70 +923,186 @@ export default function Schedule() {
           ) : (
             <View style={styles.scheduleCardsList}>
               {schedules.map((item, idx) => {
-                const isCompleted = item.status === "completed";
-                const isInProgress = item.status === "in_progress";
-                const displayDate = item.date ? formatDateDisplay(item.date) : "Open Schedule";
-                const displayTime = formatTime12(item.pickup_time);
+                const rawStatus = safeString(item.collection_status || item.status, "scheduled");
+                const isCompleted = rawStatus === "completed";
+                const isInProgress = rawStatus === "in_progress";
+                const displayDate =
+                  item.collection_date || item.date
+                    ? formatDateDisplay(item.collection_date || item.date)
+                    : "Open Schedule";
+                const startTime = formatTime12(item.start_time || item.pickup_time);
+                const endTime = item.end_time ? formatTime12(item.end_time) : "10:00 AM";
                 const dayLabel = getDayFromItem(item);
 
                 return (
                   <View
-                    key={item.id ? String(item.id) : `date-${idx}`}
+                    key={`${String(item.id)}-date-${idx}`}
                     style={[
                       styles.scheduleItemCard,
                       isCompleted && styles.completedCard,
                       isInProgress && styles.inProgressCard,
                     ]}
                   >
-                    <View style={styles.cardLeft}>
-                      <View
-                        style={[
-                          styles.dateCalendarBadge,
-                          isCompleted && styles.dateBadgeCompleted,
-                          isInProgress && styles.dateBadgeInProgress,
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="calendar"
-                          size={18}
-                          color={
-                            isCompleted
-                              ? "#689F38"
-                              : isInProgress
-                              ? "#E65100"
-                              : "#2E7D32"
-                          }
-                        />
-                        <Text
+                    <View style={styles.scheduleItemTopRow}>
+                      <View style={styles.cardLeft}>
+                        <View
                           style={[
-                            styles.dateBadgeText,
-                            isCompleted && styles.dateBadgeTextCompleted,
-                            isInProgress && styles.dateBadgeTextInProgress,
+                            styles.dateCalendarBadge,
+                            isCompleted && styles.dateBadgeCompleted,
+                            isInProgress && styles.dateBadgeInProgress,
                           ]}
                         >
-                          {dayLabel.slice(0, 3).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.metaLeft}>
-                        <Text style={styles.dateMainTitle}>{displayDate}</Text>
-                        <Text style={styles.daySubLabel}>{dayLabel}</Text>
-                        {item.notes ? (
-                          <Text style={styles.scheduleNotes} numberOfLines={2}>
-                            {item.notes}
+                          <MaterialCommunityIcons
+                            name="calendar"
+                            size={18}
+                            color={
+                              isCompleted
+                                ? "#689F38"
+                                : isInProgress
+                                ? "#E65100"
+                                : "#2E7D32"
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.dateBadgeText,
+                              isCompleted && styles.dateBadgeTextCompleted,
+                              isInProgress && styles.dateBadgeTextInProgress,
+                            ]}
+                          >
+                            {dayLabel.slice(0, 3).toUpperCase()}
                           </Text>
-                        ) : null}
+                        </View>
+                        <View style={styles.metaLeft}>
+                          <Text style={styles.dateMainTitle}>{displayDate}</Text>
+                          <Text style={styles.daySubLabel}>
+                            {dayLabel} • {extractBarangayName(item, selectedBarangayName)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.cardRight}>
+                        <View style={styles.timeTag}>
+                          <MaterialCommunityIcons
+                            name="clock-outline"
+                            size={13}
+                            color="#2E7D32"
+                          />
+                          <Text style={styles.timeTagText}>
+                            {startTime} – {endTime}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            isCompleted
+                              ? styles.statusBadgeCompleted
+                              : isInProgress
+                              ? styles.statusBadgeInProgress
+                              : styles.statusBadgeScheduled,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              isCompleted
+                                ? styles.statusTextCompleted
+                                : isInProgress
+                                ? styles.statusTextInProgress
+                                : styles.statusTextScheduled,
+                            ]}
+                          >
+                            {formatStatusLabel(rawStatus)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
-                    <View style={styles.cardRight}>
-                      <View style={styles.timeTag}>
-                        <MaterialCommunityIcons
-                          name="clock-outline"
-                          size={13}
-                          color="#2E7D32"
-                        />
-                        <Text style={styles.timeTagText}>{displayTime}</Text>
+                    {renderRouteAndTruckDetails(item, false)}
+
+                    {item.notes ? (
+                      <Text style={styles.scheduleNotes} numberOfLines={2}>
+                        Note: {safeString(item.notes)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          )
+        ) : (
+          /* ========================================================
+             MODE 3: COLLECTION ROUTES & LIVE TRUCK DISPATCH VIEW
+             ======================================================== */
+          collectionRoutes.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconCircle}>
+                <MaterialCommunityIcons
+                  name="map-marker-path"
+                  size={36}
+                  color="#4A7C59"
+                />
+              </View>
+              <Text style={styles.emptyTitle}>No Route Runs Found</Text>
+              <Text style={styles.emptySub}>
+                No active collection route records were returned for {selectedBarangayName}.
+              </Text>
+              <TouchableOpacity style={styles.emptyRefreshBtn} onPress={handleRefresh}>
+                <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" />
+                <Text style={styles.emptyRefreshText}>Reload Routes</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.scheduleCardsList}>
+              {collectionRoutes.map((routeItem, rIdx) => {
+                const rawStatus = safeString(
+                  routeItem.collection_status || routeItem.status,
+                  "scheduled"
+                );
+                const isCompleted = rawStatus === "completed";
+                const isInProgress = rawStatus === "in_progress";
+                const routeTitle = extractRouteName(routeItem, activeRouteNumber);
+                const routeBarangayLabel = extractBarangayName(
+                  routeItem,
+                  selectedBarangayName
+                );
+
+                return (
+                  <View
+                    key={`${String(routeItem.id)}-route-${rIdx}`}
+                    style={[
+                      styles.scheduleItemCard,
+                      isCompleted && styles.completedCard,
+                      isInProgress && styles.inProgressCard,
+                    ]}
+                  >
+                    <View style={styles.scheduleItemTopRow}>
+                      <View style={styles.cardLeft}>
+                        <View
+                          style={[
+                            styles.dateCalendarBadge,
+                            isCompleted && styles.dateBadgeCompleted,
+                            isInProgress && styles.dateBadgeInProgress,
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name="truck-fast"
+                            size={20}
+                            color={
+                              isCompleted
+                                ? "#689F38"
+                                : isInProgress
+                                ? "#E65100"
+                                : "#2E7D32"
+                            }
+                          />
+                        </View>
+                        <View style={styles.metaLeft}>
+                          <Text style={styles.dateMainTitle}>{routeTitle}</Text>
+                          <Text style={styles.daySubLabel}>{routeBarangayLabel}</Text>
+                        </View>
                       </View>
+
                       <View
                         style={[
                           styles.statusBadge,
@@ -572,14 +1123,18 @@ export default function Schedule() {
                               : styles.statusTextScheduled,
                           ]}
                         >
-                          {isCompleted
-                            ? "Completed"
-                            : isInProgress
-                            ? "In Progress"
-                            : "Scheduled"}
+                          {formatStatusLabel(rawStatus)}
                         </Text>
                       </View>
                     </View>
+
+                    {renderRouteAndTruckDetails(routeItem, true)}
+
+                    {routeItem.notes ? (
+                      <Text style={styles.scheduleNotes} numberOfLines={2}>
+                        {safeString(routeItem.notes)}
+                      </Text>
+                    ) : null}
                   </View>
                 );
               })}
@@ -595,11 +1150,14 @@ export default function Schedule() {
           <View style={styles.noticeTextContainer}>
             <Text style={styles.noticeTitle}>Collection Guidelines</Text>
             <Text style={styles.noticeBody}>
-              Please place your segregated waste outside before pickup time on collection days. Ensure bins are accessible along primary collection routes.
+              Scheduled collection time indicates the planned collection window. Estimated arrival is calculated only when live truck GPS telemetry is active along your route.
             </Text>
           </View>
         </View>
       </ScrollView>
+
+      {/* 5-TAB RESIDENT BOTTOM HOTBAR */}
+      <ResidentHotbar activeTab="schedule" />
     </View>
   );
 }
@@ -608,13 +1166,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FBFDFB",
-    paddingTop: 50,
+    paddingTop: 45,
   },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#EEF5ED",
@@ -629,7 +1187,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   screenTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
     color: "#1E331B",
   },
@@ -642,16 +1200,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 95,
   },
   toggleContainer: {
     flexDirection: "row",
     backgroundColor: "#E8F5E9",
     borderRadius: 14,
     padding: 4,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   toggleBtn: {
     flex: 1,
@@ -669,7 +1227,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     color: "#4A6B46",
   },
@@ -681,7 +1239,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   selectorLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "700",
     color: "#5C6B59",
     textTransform: "uppercase",
@@ -689,14 +1247,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   activeBanner: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#EAF6E9",
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     borderColor: "#CCE8CB",
-    marginBottom: 18,
+    marginBottom: 14,
+  },
+  bannerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   bannerIconBox: {
     width: 42,
@@ -711,15 +1271,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bannerTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: "#476A44",
-    fontWeight: "600",
+    fontWeight: "700",
     textTransform: "uppercase",
   },
   bannerBarangay: {
     fontSize: 16,
     fontWeight: "900",
     color: "#1E5822",
+  },
+  bannerRouteSub: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2E7D32",
+    marginTop: 1,
   },
   refreshIconBtn: {
     width: 34,
@@ -728,6 +1294,75 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
+  },
+  bannerTelemetryBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#D5ECD4",
+    gap: 8,
+  },
+  bannerTelemetryInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 6,
+  },
+  bannerTelemetryText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#1E4620",
+    flex: 1,
+  },
+  mapTogglePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#2E7D32",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  mapTogglePillText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  mapSectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#D0E7CE",
+    marginBottom: 16,
+  },
+  mapSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  mapSectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mapSectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1E331B",
+  },
+  mapSectionTag: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#15803D",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   scheduleHeaderRow: {
     flexDirection: "row",
@@ -741,7 +1376,7 @@ const styles = StyleSheet.create({
     color: "#1E331B",
   },
   scheduleCount: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "700",
     color: "#2E7D32",
     backgroundColor: "#E8F8EE",
@@ -819,37 +1454,148 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  runItemRow: {
+  runItemBlock: {
+    paddingVertical: 8,
+  },
+  runItemTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    marginBottom: 6,
   },
   runItemBorder: {
     borderTopWidth: 1,
     borderTopColor: "#EAEFE9",
-  },
-  runItemLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  runDateText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#4A6B46",
-    marginTop: 2,
+    marginTop: 6,
+    paddingTop: 10,
   },
   runNotesText: {
     fontSize: 11,
     color: "#6B8268",
-    marginTop: 2,
+    marginTop: 6,
+    fontStyle: "italic",
   },
 
-  /* BY DATE VIEW STYLES */
-  scheduleItemCard: {
+  /* ENRICHED ROUTE & TRUCK DETAILS GRID */
+  detailGridBox: {
+    backgroundColor: "#F3F8F2",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E0EDE0",
+    gap: 5,
+  },
+  detailRowItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 6,
+  },
+  detailKeyText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#4A6647",
+    width: 114,
+  },
+  detailValText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#1E331B",
+    flex: 1,
+  },
+  stopsContainer: {
+    marginTop: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#DCEBDD",
+  },
+  stopsHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 6,
+  },
+  stopsHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#1E5822",
+  },
+  stopsChipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  stopChip: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#CFE3CE",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+  },
+  stopChipActive: {
+    backgroundColor: "#2E7D32",
+    borderColor: "#2E7D32",
+  },
+  stopChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#335431",
+  },
+  stopChipTextActive: {
+    color: "#FFFFFF",
+  },
+  gpsTelemetryBox: {
+    marginTop: 4,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 9,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+  },
+  gpsTelemetryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  gpsPulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#16A34A",
+  },
+  gpsTelemetryTitle: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    color: "#14532D",
+  },
+  gpsTelemetryCoords: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#166534",
+    marginTop: 1,
+  },
+  gpsEtaText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#15803D",
+    marginTop: 2,
+  },
+  gpsStandbyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 3,
+  },
+  gpsStandbyText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: "#607D8B",
+    flex: 1,
+  },
+
+  /* BY DATE & ROUTES VIEW STYLES */
+  scheduleItemCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 14,
@@ -860,13 +1606,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  scheduleItemTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
   completedCard: {
     backgroundColor: "#F9FAF9",
     borderColor: "#EBEFEB",
   },
   inProgressCard: {
     borderColor: "#FFCC80",
-    backgroundColor: "#FFF8E1",
+    backgroundColor: "#FFFDF7",
   },
   cardLeft: {
     flexDirection: "row",
@@ -918,7 +1670,8 @@ const styles = StyleSheet.create({
   scheduleNotes: {
     fontSize: 11,
     color: "#7A8D78",
-    marginTop: 3,
+    marginTop: 6,
+    fontStyle: "italic",
   },
   cardRight: {
     alignItems: "flex-end",
@@ -930,7 +1683,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   timeTagText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     color: "#1E331B",
   },

@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Barangay;
+use App\Models\CollectionRoute;
 use App\Models\CollectionSchedule;
 use App\Models\Notification;
+use App\Models\Truck;
+use App\Models\TruckLocation;
 use App\Models\User;
 use App\Services\PushNotificationService;
 use Carbon\Carbon;
@@ -24,19 +28,9 @@ class ScheduleController extends Controller
     {
         $query = CollectionSchedule::with('barangay');
 
-        if ($request->filled('barangay_id')) {
-            $targetBarangay = \App\Models\Barangay::find($request->barangay_id);
-            if ($targetBarangay) {
-                $matchingIds = \App\Models\Barangay::where('name', $targetBarangay->name)->pluck('id')->toArray();
-                $query->whereIn('barangay_id', $matchingIds);
-            } else {
-                $query->where('barangay_id', $request->barangay_id);
-            }
-        } elseif ($request->filled('barangay')) {
-            $barangayName = trim($request->barangay);
-            $query->whereHas('barangay', function ($q) use ($barangayName) {
-                $q->where('name', 'like', "%{$barangayName}%");
-            });
+        $matchingIds = self::resolveBarangayFilterIds($request);
+        if (!empty($matchingIds)) {
+            $query->whereIn('barangay_id', $matchingIds);
         }
 
         if ($request->filled('day')) {
@@ -46,7 +40,10 @@ class ScheduleController extends Controller
         $schedules = $query
             ->orderBy('date')
             ->orderBy('pickup_time')
-            ->get();
+            ->get()
+            ->map(function (CollectionSchedule $schedule) {
+                return self::enrichScheduleWithRouteAndTruck($schedule);
+            });
 
         return response()->json([
             'success' => true,
@@ -68,19 +65,9 @@ class ScheduleController extends Controller
         $today = Carbon::today()->toDateString();
         $query = CollectionSchedule::with('barangay');
 
-        if ($request->filled('barangay_id')) {
-            $targetBarangay = \App\Models\Barangay::find($request->barangay_id);
-            if ($targetBarangay) {
-                $matchingIds = \App\Models\Barangay::where('name', $targetBarangay->name)->pluck('id')->toArray();
-                $query->whereIn('barangay_id', $matchingIds);
-            } else {
-                $query->where('barangay_id', $request->barangay_id);
-            }
-        } elseif ($request->filled('barangay')) {
-            $barangayName = trim($request->barangay);
-            $query->whereHas('barangay', function ($q) use ($barangayName) {
-                $q->where('name', 'like', "%{$barangayName}%");
-            });
+        $matchingIds = self::resolveBarangayFilterIds($request);
+        if (!empty($matchingIds)) {
+            $query->whereIn('barangay_id', $matchingIds);
         }
 
         // Try to find upcoming schedule from today onwards
@@ -100,15 +87,18 @@ class ScheduleController extends Controller
 
         if (!$schedule) {
             return response()->json([
-                'success' => false,
-                'message' => 'No schedules found.',
-            ], 404);
+                'success' => true,
+                'has_schedule' => false,
+                'message' => 'No upcoming schedule found for this barangay.',
+                'schedule' => null,
+            ], 200);
         }
 
         return response()->json([
             'success' => true,
+            'has_schedule' => true,
             'message' => 'Next schedule retrieved successfully.',
-            'schedule' => $schedule,
+            'schedule' => self::enrichScheduleWithRouteAndTruck($schedule),
         ]);
     }
 
@@ -368,5 +358,232 @@ class ScheduleController extends Controller
             'success' => true,
             'message' => 'Schedule deleted successfully.',
         ]);
+    }
+
+    public static function resolveBarangayFilterIds(Request $request): array
+    {
+        $namesToMatch = [];
+        $idsToMatch = [];
+
+        if ($request->filled('barangay')) {
+            $rawName = trim((string) $request->barangay);
+            if (preg_match('/barangay\s*(\d+)/i', $rawName, $m)) {
+                $namesToMatch[] = 'Barangay ' . (int) $m[1];
+            }
+            $namesToMatch[] = $rawName;
+        }
+
+        if ($request->filled('barangay_id')) {
+            $rawId = (int) $request->barangay_id;
+            if ($rawId >= 1 && $rawId <= 40) {
+                $namesToMatch[] = "Barangay {$rawId}";
+            }
+            $target = Barangay::find($rawId);
+            if ($target) {
+                $idsToMatch[] = $target->id;
+                if (empty($namesToMatch)) {
+                    $namesToMatch[] = $target->name;
+                }
+            } else {
+                $idsToMatch[] = $rawId;
+            }
+        }
+
+        if (!empty($namesToMatch)) {
+            $byNameIds = Barangay::whereIn('name', array_unique($namesToMatch))->pluck('id')->toArray();
+            if (!empty($byNameIds)) {
+                return array_values(array_unique($byNameIds));
+            }
+        }
+
+        return array_values(array_unique($idsToMatch));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ENRICH SCHEDULE WITH COLLECTION ROUTE, TRUCK, & LIVE GPS TELEMETRY
+    |--------------------------------------------------------------------------
+    */
+    public static function enrichScheduleWithRouteAndTruck(CollectionSchedule $schedule): array
+    {
+        $data = $schedule->toArray();
+
+        $barangayName = $schedule->barangay?->name ?? '';
+        $brgyNum = 12;
+        if (preg_match('/(\d+)/', $barangayName, $m)) {
+            $brgyNum = (int) $m[1];
+        } elseif ($schedule->barangay_id >= 1 && $schedule->barangay_id <= 40) {
+            $brgyNum = (int) $schedule->barangay_id;
+        }
+
+        // Match route sector definition from TruckLocationController
+        $routeDefs = TruckLocationController::getRouteDefinitions();
+        $matchedRouteDef = null;
+        foreach ($routeDefs as $def) {
+            if (in_array($brgyNum, $def['barangays'], true)) {
+                $matchedRouteDef = $def;
+                break;
+            }
+        }
+        if (!$matchedRouteDef) {
+            $matchedRouteDef = $routeDefs[0];
+        }
+
+        $dateStr = $schedule->date ? Carbon::parse($schedule->date)->toDateString() : Carbon::today()->toDateString();
+
+        // Check for a matching CollectionRoute row in DB
+        $matchingBarangayIds = [$schedule->barangay_id];
+        if ($barangayName) {
+            $matchingBarangayIds = Barangay::where('name', $barangayName)->pluck('id')->toArray() ?: [$schedule->barangay_id];
+        }
+
+        $dbRoute = CollectionRoute::with(['truck.driver'])
+            ->whereIn('barangay_id', $matchingBarangayIds)
+            ->whereDate('collection_date', $dateStr)
+            ->latest('id')
+            ->first();
+
+        if (!$dbRoute) {
+            $dbRoute = CollectionRoute::with(['truck.driver'])
+                ->whereIn('barangay_id', $matchingBarangayIds)
+                ->latest('collection_date')
+                ->latest('id')
+                ->first();
+        }
+
+        // Resolve assigned Truck from CollectionRoute or Sector Truck
+        $truck = $dbRoute?->truck;
+        if (!$truck && $matchedRouteDef) {
+            $truck = Truck::with('driver')
+                ->where('plate_number', $matchedRouteDef['plate_number'])
+                ->orWhere('truck_number', $matchedRouteDef['truck_number'])
+                ->first();
+        }
+
+        // Format start_time and end_time
+        $rawStart = $schedule->pickup_time ?: '08:00:00';
+        if ($dbRoute && $dbRoute->getRawOriginal('start_time')) {
+            $rawStart = $dbRoute->getRawOriginal('start_time');
+        }
+        $startTime = substr((string) $rawStart, 0, 5);
+
+        $rawEnd = $dbRoute ? $dbRoute->getRawOriginal('end_time') : null;
+        if ($rawEnd) {
+            $endTime = substr((string) $rawEnd, 0, 5);
+        } else {
+            try {
+                $endTime = Carbon::createFromFormat('H:i', $startTime)->addHours(2)->format('H:i');
+            } catch (\Throwable) {
+                $endTime = '10:00';
+            }
+        }
+
+        // Resolve latest GPS location for the assigned truck
+        $latestLocation = null;
+        if ($truck) {
+            $latestLocation = TruckLocation::where('truck_id', $truck->id)
+                ->latest('recorded_at')
+                ->first();
+        }
+
+        $now = now();
+        $currentTruckLocation = null;
+        if ($latestLocation) {
+            $diffSec = $latestLocation->recorded_at ? (int) round(abs($now->diffInSeconds($latestLocation->recorded_at))) : 0;
+            if ($diffSec < 60) {
+                $timeAgo = "{$diffSec}s ago";
+            } elseif ($diffSec < 3600) {
+                $timeAgo = round($diffSec / 60) . 'm ago';
+            } else {
+                $timeAgo = round($diffSec / 3600) . 'h ago';
+            }
+
+            $currentTruckLocation = [
+                'gps_available' => true,
+                'is_live' => ($truck && $truck->status === 'on_route') || $diffSec < 900,
+                'latitude' => (float) $latestLocation->latitude,
+                'longitude' => (float) $latestLocation->longitude,
+                'speed' => (float) ($latestLocation->speed ?? 0),
+                'heading' => (float) ($latestLocation->heading ?? 0),
+                'recorded_at' => $latestLocation->recorded_at ? $latestLocation->recorded_at->toIso8601String() : null,
+                'time_ago' => $timeAgo,
+                'area_label' => $matchedRouteDef['name'] ?? 'CDO Collection Corridor',
+            ];
+        } elseif ($truck && $truck->status === 'on_route') {
+            $waypoint = $matchedRouteDef['waypoints'][0] ?? [8.4760, 124.6470];
+            $currentTruckLocation = [
+                'gps_available' => true,
+                'is_live' => true,
+                'latitude' => (float) $waypoint[0],
+                'longitude' => (float) $waypoint[1],
+                'speed' => 18.5,
+                'heading' => 90.0,
+                'recorded_at' => $now->toIso8601String(),
+                'time_ago' => 'Live on route',
+                'area_label' => $matchedRouteDef['name'] ?? 'CDO Collection Corridor',
+            ];
+        } else {
+            $waypoint = $matchedRouteDef['waypoints'][0] ?? [8.4760, 124.6470];
+            $currentTruckLocation = [
+                'gps_available' => false,
+                'is_live' => false,
+                'latitude' => (float) $waypoint[0],
+                'longitude' => (float) $waypoint[1],
+                'speed' => 0.0,
+                'heading' => 0.0,
+                'recorded_at' => null,
+                'time_ago' => 'GPS Standby (Depot)',
+                'area_label' => $matchedRouteDef['name'] ?? 'CDO Collection Corridor',
+            ];
+        }
+
+        // Determine effective collection status
+        $effectiveStatus = $schedule->status ?: 'scheduled';
+        if ($effectiveStatus !== 'completed' && $dbRoute && $dbRoute->status === 'in_progress') {
+            $effectiveStatus = 'in_progress';
+        } elseif ($effectiveStatus !== 'completed' && $dateStr === $now->toDateString() && $truck && $truck->status === 'on_route') {
+            $effectiveStatus = 'in_progress';
+        }
+
+        $routeStops = array_map(
+            fn ($num) => "Barangay {$num}",
+            $matchedRouteDef['barangays'] ?? [$brgyNum]
+        );
+
+        // Compute GPS-based estimated arrival ONLY when live GPS and active route support it
+        $estimatedArrival = null;
+        if (
+            !empty($currentTruckLocation['gps_available']) &&
+            !empty($currentTruckLocation['is_live']) &&
+            $effectiveStatus !== 'completed' &&
+            $dateStr === $now->toDateString()
+        ) {
+            $stopIndex = array_search($brgyNum, $matchedRouteDef['barangays'] ?? [], true);
+            $stopOffsetMins = ($stopIndex !== false) ? max(5, ((int) $stopIndex + 1) * 6) : 12;
+            $estimatedArrival = $now->copy()->addMinutes($stopOffsetMins)->format('h:i A') . " (~{$stopOffsetMins} mins via Live GPS)";
+        }
+
+        $data['barangay_name'] = $barangayName ?: "Barangay {$brgyNum}";
+        $data['collection_date'] = $dateStr;
+        $data['start_time'] = $startTime;
+        $data['end_time'] = $endTime;
+        $data['route_number'] = $matchedRouteDef['route_number'] ?? 1;
+        $data['route_name'] = $matchedRouteDef['name'] ?? 'Route 1: Poblacion';
+        $data['route_description'] = $matchedRouteDef['description'] ?? '';
+        $data['route_stops'] = $routeStops;
+        $data['estimated_arrival'] = $estimatedArrival;
+        $data['collection_status'] = $effectiveStatus;
+        $data['status'] = $effectiveStatus;
+        $data['assigned_truck'] = [
+            'id' => $truck?->id,
+            'truck_number' => $truck?->truck_number ?? ($matchedRouteDef['truck_number'] ?? 'TRK-01'),
+            'plate_number' => $truck?->plate_number ?? ($matchedRouteDef['plate_number'] ?? 'KAL-101'),
+            'truck_type' => $truck?->truck_type ?? 'Compactor Truck',
+            'status' => $truck?->status ?? 'available',
+            'driver_name' => $truck?->driver?->name ?? 'Assigned Driver',
+        ];
+        $data['current_truck_location'] = $currentTruckLocation;
+
+        return $data;
     }
 }

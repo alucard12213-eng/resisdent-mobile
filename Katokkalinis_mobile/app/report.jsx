@@ -15,6 +15,7 @@ import {
 import InitialsAvatar from "../components/InitialsAvatar";
 import KatokLogo from "../components/KatokLogo";
 import ReportEvidenceImage from "../components/ReportEvidenceImage";
+import ResidentHotbar from "../components/ResidentHotbar";
 import { resolveMediaUrl } from "../services/api";
 import { fetchReports } from "../services/resident";
 
@@ -398,43 +399,7 @@ export default function Report() {
       </Modal>
 
       {/* 8. BOTTOM NAVIGATION BAR */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          activeOpacity={0.8}
-          onPress={() => router.push("/dashboard")}
-        >
-          <MaterialCommunityIcons name="home-outline" size={24} color="#7A8D78" />
-          <Text style={styles.navItemText}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          activeOpacity={0.8}
-          onPress={() => {}}
-        >
-          <MaterialCommunityIcons name="file-document" size={24} color="#2E7D32" />
-          <Text style={[styles.navItemText, styles.navItemTextActive]}>Reports</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          activeOpacity={0.8}
-          onPress={() => router.push("/schedule")}
-        >
-          <MaterialCommunityIcons name="calendar-month-outline" size={24} color="#7A8D78" />
-          <Text style={styles.navItemText}>Schedule</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          activeOpacity={0.8}
-          onPress={() => router.push("/profile")}
-        >
-          <MaterialCommunityIcons name="account-outline" size={24} color="#7A8D78" />
-          <Text style={styles.navItemText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <ResidentHotbar activeTab="reports" />
     </View>
   );
 }

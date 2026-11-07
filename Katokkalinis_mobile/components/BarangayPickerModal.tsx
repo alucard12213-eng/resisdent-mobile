@@ -24,7 +24,7 @@ export const BARANGAYS_1_TO_40: BarangayItem[] = Array.from({ length: 40 }, (_, 
 }));
 
 interface BarangayPickerModalProps {
-  selectedBarangay: string;
+  selectedBarangay: string | BarangayItem | null | undefined;
   onSelect: (barangay: BarangayItem) => void;
   label?: string;
   placeholder?: string;
@@ -41,6 +41,15 @@ export default function BarangayPickerModal({
 }: BarangayPickerModalProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const selectedBarangayLabel = useMemo(() => {
+    if (!selectedBarangay) return "";
+    if (typeof selectedBarangay === "string") return selectedBarangay;
+    if (typeof selectedBarangay === "object" && selectedBarangay.name) {
+      return String(selectedBarangay.name);
+    }
+    return "";
+  }, [selectedBarangay]);
 
   const filteredBarangays = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -73,17 +82,17 @@ export default function BarangayPickerModal({
           <MaterialCommunityIcons
             name="map-marker-outline"
             size={20}
-            color={selectedBarangay ? "#2E7D32" : "#7A8D78"}
+            color={selectedBarangayLabel ? "#2E7D32" : "#7A8D78"}
             style={styles.triggerIcon}
           />
           <Text
             style={[
               styles.triggerText,
-              !selectedBarangay && styles.triggerPlaceholder,
+              !selectedBarangayLabel && styles.triggerPlaceholder,
             ]}
             numberOfLines={1}
           >
-            {selectedBarangay || placeholder}
+            {selectedBarangayLabel || placeholder}
           </Text>
         </View>
 
@@ -157,9 +166,9 @@ export default function BarangayPickerModal({
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => {
                 const isSelected =
-                  selectedBarangay === item.name ||
-                  selectedBarangay === `Barangay ${item.id}` ||
-                  selectedBarangay === String(item.id);
+                  selectedBarangayLabel === item.name ||
+                  selectedBarangayLabel === `Barangay ${item.id}` ||
+                  selectedBarangayLabel === String(item.id);
 
                 return (
                   <TouchableOpacity
