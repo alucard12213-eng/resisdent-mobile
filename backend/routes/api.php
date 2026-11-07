@@ -350,16 +350,19 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 
+Route::get('/collection-routes/options', [CollectionRouteController::class, 'options']);
+Route::get('/public/collection-routes/options', [CollectionRouteController::class, 'options']);
 Route::get('/collection-routes', [CollectionRouteController::class, 'index']);
 Route::get('/collection-routes/{id}', [CollectionRouteController::class, 'show']);
+Route::post('/collection-routes', [CollectionRouteController::class, 'store']);
+Route::put('/collection-routes/{id}', [CollectionRouteController::class, 'update']);
+Route::delete('/collection-routes/{id}', [CollectionRouteController::class, 'destroy']);
+
 Route::get('/public/collection-routes', [CollectionRouteController::class, 'index']);
 Route::get('/public/collection-routes/{id}', [CollectionRouteController::class, 'show']);
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/collection-routes', [CollectionRouteController::class, 'store']);
-    Route::put('/collection-routes/{id}', [CollectionRouteController::class, 'update']);
-    Route::delete('/collection-routes/{id}', [CollectionRouteController::class, 'destroy']);
-});
+Route::post('/public/collection-routes', [CollectionRouteController::class, 'store']);
+Route::put('/public/collection-routes/{id}', [CollectionRouteController::class, 'update']);
+Route::delete('/public/collection-routes/{id}', [CollectionRouteController::class, 'destroy']);
 
 
 /*

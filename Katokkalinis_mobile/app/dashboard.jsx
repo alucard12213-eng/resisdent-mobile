@@ -435,15 +435,31 @@ export default function Dashboard() {
             </View>
 
             <Text style={styles.heroSubDetail}>
-              {nextSchedule?.pickup_time || nextSchedule?.start_time
-                ? `Scheduled Window: ${pickupTimeDisplay}${
-                    endTimeDisplay ? ` – ${endTimeDisplay}` : ""
-                  }`
+              {nextSchedule?.start_time_formatted || nextSchedule?.pickup_time || nextSchedule?.start_time
+                ? `Start: ${safeString(nextSchedule?.start_time_formatted || pickupTimeDisplay)} • Est. Arrival: ${safeString(
+                    nextSchedule?.estimated_arrival_formatted || endTimeDisplay || "12:00 PM"
+                  )}`
                 : "Tap to view barangay collection calendar"}
             </Text>
 
             {(routeNameDisplay || assignedTruckDisplay) ? (
               <View style={styles.heroRouteMeta}>
+                {nextSchedule?.start_location && nextSchedule?.end_location ? (
+                  <View style={styles.heroRouteRow}>
+                    <MaterialCommunityIcons name="routes" size={13} color="#2E7D32" />
+                    <Text style={styles.heroRouteText} numberOfLines={1}>
+                      {`${safeString(nextSchedule.start_location)} → ${safeString(nextSchedule.end_location)}`}
+                    </Text>
+                  </View>
+                ) : null}
+                {nextSchedule?.estimated_duration ? (
+                  <View style={styles.heroRouteRow}>
+                    <MaterialCommunityIcons name="timer-outline" size={13} color="#E65100" />
+                    <Text style={styles.heroRouteText} numberOfLines={1}>
+                      Est. Travel Time: {safeString(nextSchedule.estimated_duration)}
+                    </Text>
+                  </View>
+                ) : null}
                 {routeNameDisplay ? (
                   <View style={styles.heroRouteRow}>
                     <MaterialCommunityIcons name="map-marker-path" size={13} color="#2E7D32" />

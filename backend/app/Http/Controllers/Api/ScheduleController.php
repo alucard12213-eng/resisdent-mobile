@@ -437,14 +437,14 @@ class ScheduleController extends Controller
             $matchingBarangayIds = Barangay::where('name', $barangayName)->pluck('id')->toArray() ?: [$schedule->barangay_id];
         }
 
-        $dbRoute = CollectionRoute::with(['truck.driver'])
+        $dbRoute = CollectionRoute::with(['truck.driver', 'assignedPersonnel', 'stops'])
             ->whereIn('barangay_id', $matchingBarangayIds)
             ->whereDate('collection_date', $dateStr)
             ->latest('id')
             ->first();
 
         if (!$dbRoute) {
-            $dbRoute = CollectionRoute::with(['truck.driver'])
+            $dbRoute = CollectionRoute::with(['truck.driver', 'assignedPersonnel', 'stops'])
                 ->whereIn('barangay_id', $matchingBarangayIds)
                 ->latest('collection_date')
                 ->latest('id')
@@ -461,22 +461,38 @@ class ScheduleController extends Controller
         }
 
         // Format start_time and end_time
-        $rawStart = $schedule->pickup_time ?: '08:00:00';
+        $rawStart = $schedule->pickup_time ?: '09:00:00';
         if ($dbRoute && $dbRoute->getRawOriginal('start_time')) {
             $rawStart = $dbRoute->getRawOriginal('start_time');
         }
         $startTime = substr((string) $rawStart, 0, 5);
 
-        $rawEnd = $dbRoute ? $dbRoute->getRawOriginal('end_time') : null;
-        if ($rawEnd) {
-            $endTime = substr((string) $rawEnd, 0, 5);
+        $startLocation = $dbRoute?->start_location ?: ($barangayName ? "{$barangayName} Barangay Hall" : 'Barangay Hall');
+        $endLocation = $dbRoute?->end_location ?: 'Sanitation Facility';
+        $distanceKm = (float) ($dbRoute?->distance_km ?: 15.0);
+        $stopDurationMins = (int) ($dbRoute?->stop_duration_minutes ?: 40);
+
+        $rawStops = $dbRoute?->collection_stops;
+        if (empty($rawStops)) {
+            $rawStops = [
+                ['stop_order' => 1, 'name' => 'First Collection Point', 'duration_minutes' => $stopDurationMins],
+                ['stop_order' => 2, 'name' => 'Second Collection Point', 'duration_minutes' => $stopDurationMins],
+                ['stop_order' => 3, 'name' => 'Final Collection Point', 'duration_minutes' => $stopDurationMins],
+            ];
         } else {
-            try {
-                $endTime = Carbon::createFromFormat('H:i', $startTime)->addHours(2)->format('H:i');
-            } catch (\Throwable) {
-                $endTime = '10:00';
-            }
+            $rawStops = CollectionRouteController::normalizeStopsInput($rawStops, $stopDurationMins);
         }
+
+        $calc = CollectionRouteController::calculateRouteSchedule(
+            $startLocation,
+            $endLocation,
+            $startTime,
+            $rawStops,
+            $distanceKm,
+            $stopDurationMins,
+            $dbRoute?->estimated_duration_minutes ? (int) $dbRoute->estimated_duration_minutes : null
+        );
+        $endTime = $calc['estimated_arrival_24'];
 
         // Resolve latest GPS location for the assigned truck
         $latestLocation = null;
@@ -563,25 +579,43 @@ class ScheduleController extends Controller
             $estimatedArrival = $now->copy()->addMinutes($stopOffsetMins)->format('h:i A') . " (~{$stopOffsetMins} mins via Live GPS)";
         }
 
+        $personnel = $dbRoute?->assignedPersonnel ?: $truck?->driver;
+
         $data['barangay_name'] = $barangayName ?: "Barangay {$brgyNum}";
         $data['collection_date'] = $dateStr;
-        $data['start_time'] = $startTime;
+        $data['start_location'] = $startLocation;
+        $data['end_location'] = $endLocation;
+        $data['start_time'] = $calc['start_time_24'];
+        $data['start_time_formatted'] = $calc['start_time_formatted'];
         $data['end_time'] = $endTime;
+        $data['estimated_arrival_time'] = $calc['estimated_arrival_24'];
+        $data['estimated_arrival_formatted'] = $calc['estimated_arrival_formatted'];
+        $data['estimated_duration_minutes'] = $calc['estimated_duration_minutes'];
+        $data['estimated_duration'] = $calc['estimated_duration'];
+        $data['distance_km'] = $distanceKm;
+        $data['stop_duration_minutes'] = $stopDurationMins;
+        $data['collection_stops'] = $calc['stops'];
+        $data['timeline'] = $calc['timeline'];
         $data['route_number'] = $matchedRouteDef['route_number'] ?? 1;
-        $data['route_name'] = $matchedRouteDef['name'] ?? 'Route 1: Poblacion';
+        $data['route_name'] = $dbRoute?->route_name ?: ($matchedRouteDef['name'] ?? 'Route 1: Poblacion');
         $data['route_description'] = $matchedRouteDef['description'] ?? '';
-        $data['route_stops'] = $routeStops;
-        $data['estimated_arrival'] = $estimatedArrival;
+        $data['route_stops'] = array_map(fn ($s) => $s['name'], $calc['stops']);
+        $data['estimated_arrival'] = $estimatedArrival ?: $calc['estimated_arrival_formatted'];
         $data['collection_status'] = $effectiveStatus;
         $data['status'] = $effectiveStatus;
+        $data['assigned_personnel'] = [
+            'id' => $personnel?->id,
+            'name' => $personnel?->name ?? ($truck?->driver?->name ?? 'Assigned Driver'),
+        ];
         $data['assigned_truck'] = [
             'id' => $truck?->id,
             'truck_number' => $truck?->truck_number ?? ($matchedRouteDef['truck_number'] ?? 'TRK-01'),
             'plate_number' => $truck?->plate_number ?? ($matchedRouteDef['plate_number'] ?? 'KAL-101'),
             'truck_type' => $truck?->truck_type ?? 'Compactor Truck',
             'status' => $truck?->status ?? 'available',
-            'driver_name' => $truck?->driver?->name ?? 'Assigned Driver',
+            'driver_name' => $personnel?->name ?? ($truck?->driver?->name ?? 'Assigned Driver'),
         ];
+        $data['assigned_vehicle'] = $data['assigned_truck'];
         $data['current_truck_location'] = $currentTruckLocation;
 
         return $data;
